@@ -5,7 +5,7 @@
 
 The MoonBlokz Crypto Library offers cryptographic functionalities for signing and verifying messages using various algorithms. It supports both Schnorr and BLS signatures, enabling single and multi-signature operations. This library is specifically designed to meet the needs of the MoonBlokz blockchain, which is tailored for radio communication and microcontrollers [https://www.moonblokz.com](https://www.moonblokz.com). For BLS signatures, the library acts as a wrapper around the "bls-bls12_381-bls" crate, while it includes its own implementation for Schnorr signatures.
 
-Comprehensive details about MoonBlokz and the cryptographic algorithms used can be found in the [Moonblokz article series](https://medium.com/@peter.sallai/moonblokz-series-part-i-building-a-hyper-local-blockchain-2f385b763c65). Part VI of the series discusses the crypto algorithms utilized.
+Comprehensive details about MoonBlokz and the cryptographic algorithms used can be found in the [MoonBlokz article series](https://medium.com/@peter.sallai/moonblokz-series-part-i-building-a-hyper-local-blockchain-2f385b763c65). Part VI of the series discusses the crypto algorithms utilized.
 
 ---
 
@@ -25,9 +25,9 @@ Add the crate to your `Cargo.toml` and enable the desired feature:
 
 ```toml
 [dependencies]
-moonblokz-crypto = { version = "0.9.0", features = ["schnorr-malachite"] }
-# moonblokz-crypto = { version = "0.9.0", features = ["schnorr-num-bigint-dig"] }
-# moonblokz-crypto = { version = "0.9.0", features = ["bls-bls12_381-bls"] }
+moonblokz-crypto = { version = "1.0", features = ["schnorr-malachite"] }
+# moonblokz-crypto = { version = "1.0", features = ["schnorr-num-bigint-dig"] }
+# moonblokz-crypto = { version = "1.0", features = ["bls-bls12_381-bls"] }
 ```
 
 ---
@@ -68,12 +68,49 @@ fn main() {
 ```
 ---
 
-## API Overview
+## Architecture
 
-- `CryptoTrait`: Trait for cryptographic signers (key management, signing, verification, aggregation).
-- `SignatureTrait`, `MultiSignatureTrait`, `AggregatedSignatureTrait`: Traits for signature types. Normal signatures cannot be aggregated, only signatures that created as MultiSignatures can be aggregated into an AggregatedSignature.
-- `PublicKeyTrait`: Trait for public key operations.
-- `CryptoError`: Error type for cryptographic operations.
+The structure of different structs in this crate are the following:
+```
+
+              ┌────────────────────────┐                  
+              │                        │                  
+              │  Message, Private Key  │                  
+              │                        │                  
+              └────────────────────────┘                  
+                           │                              
+             ┌────sign─────┴──multi_sign───┐              
+             │                             │              
+             ▼                             ▼              
+┌────────────────────────┐    ┌────────────────────────┐  
+│                        │    │                        ├┐ 
+│       Signature        │    │     MultiSignature     │├┐
+│                        │    │                        │││
+└────────────────────────┘    └┬───────────────────────┘││
+             ▲                 └┬───────────────────────┘│
+             │                  └────────────────────────┘
+             │                               │            
+             │                     aggregate_signatures   
+             │                               ▼            
+             │                  ┌────────────────────────┐
+             │                  │                        │
+     verify_signature           │  AggregatedSignature   │
+             │                  │                        │
+             │                  └────────────────────────┘
+             │                               ▲            
+             │                               │            
+             │              ┌────────────────┘            
+             │      verify_aggregated_signature           
+             │              │                             
+             │ ┌────────────────────────┐                 
+             │ │                        │                 
+             └─│  Message, PublicKey(s) │                 
+               │                        │                 
+               └────────────────────────┘                 
+
+```
+
+To create a Signature or a MultiSignature, both a message and a private key are required. A Signature is the simpler of the two options and can be verified using the message and a PublicKey. A MultiSignature can also be generated from a message and a private key, allowing multiple signatures to be combined into an AggregatedSignature. This AggregatedSignature can be verified using the original message and a list of PublicKeys.
 
 See the [documentation](https://docs.rs/moonblokz-crypto) for full API details.
 
