@@ -48,7 +48,7 @@ fn main() {
 }
 ```
 
-Aggregated signature:
+Aggregated signatures:
 
 ```rust
 use moonblokz_crypto::{Crypto, CryptoTrait};
@@ -66,13 +66,12 @@ fn main() {
     assert!(signer1.verify_aggregated_signature(message, &aggregated, &public_keys));
 }
 ```
-
 ---
 
 ## API Overview
 
 - `CryptoTrait`: Trait for cryptographic signers (key management, signing, verification, aggregation).
-- `SignatureTrait`, `MultiSignatureTrait`, `AggregatedSignatureTrait`: Traits for signature types.
+- `SignatureTrait`, `MultiSignatureTrait`, `AggregatedSignatureTrait`: Traits for signature types. Normal signatures cannot be aggregated, only signatures that created as MultiSignatures can be aggregated into an AggregatedSignature.
 - `PublicKeyTrait`: Trait for public key operations.
 - `CryptoError`: Error type for cryptographic operations.
 
