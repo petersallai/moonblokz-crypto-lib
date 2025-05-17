@@ -7,6 +7,9 @@ license = "MIT"
 homepage = "moonblokz.com"
 authors = ["Peter Sallai (Bad Access)<peter.sallai@badaccess.eu>"]
 keywords = ["moonblokz", "crypto", "schnorr", "bls"]
+repository = "https://github.com/petersallai/moonblokz-crypto-lib"
+readme = "README.md"
+categories = ["crypto"]
 
 [dependencies]
 sha2 = { version = "0.10", default-features = false,optional = true}
