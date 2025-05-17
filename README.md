@@ -24,9 +24,9 @@ Add the crate to your `Cargo.toml` and enable the desired feature:
 
 ```toml
 [dependencies]
-moonblokz-crypto = { version = "1.0", features = ["schnorr-malachite"] }
-# moonblokz-crypto = { version = "1.0", features = ["schnorr-num-bigint-dig"] }
-# moonblokz-crypto = { version = "1.0", features = ["bls-bls12_381-bls"] }
+moonblokz-crypto = { version = "1.0", features = ["schnorr-malachite"], default-features=false }
+# moonblokz-crypto = { version = "1.0", features = ["schnorr-num-bigint-dig"],default-features=false  }
+# moonblokz-crypto = { version = "1.0", features = ["bls-bls12_381-bls"], default-features=false  }
 ```
 
 ---
