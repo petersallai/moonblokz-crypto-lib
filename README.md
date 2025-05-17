@@ -1,6 +1,5 @@
 # MoonBlokz Crypto Library
 
-[![Crates.io](https://img.shields.io/crates/v/moonblokz-crypto.svg)](https://crates.io/crates/moonblokz-crypto)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 The MoonBlokz Crypto Library offers cryptographic functionalities for signing and verifying messages using various algorithms. It supports both Schnorr and BLS signatures, enabling single and multi-signature operations. This library is specifically designed to meet the needs of the MoonBlokz blockchain, which is tailored for radio communication and microcontrollers [https://www.moonblokz.com](https://www.moonblokz.com). For BLS signatures, the library acts as a wrapper around the "bls-bls12_381-bls" crate, while it includes its own implementation for Schnorr signatures.
@@ -112,7 +111,7 @@ The structure of different structs in this crate are the following:
 
 To create a Signature or a MultiSignature, both a message and a private key are required. A Signature is the simpler of the two options and can be verified using the message and a PublicKey. A MultiSignature can also be generated from a message and a private key, allowing multiple signatures to be combined into an AggregatedSignature. This AggregatedSignature can be verified using the original message and a list of PublicKeys.
 
-See the [documentation](https://docs.rs/moonblokz-crypto) for full API details.
+See the documentation (cargo doc --open) for full API details.
 
 ---
 
@@ -135,7 +134,7 @@ cargo test
 ## License
 
 This library is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-Dependent libraries use different licenses. Please check it before usage.
+Dependent libraries use different licenses. Please check it before using.
 
 ---
 
