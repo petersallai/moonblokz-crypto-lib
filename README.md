@@ -1,11 +1,11 @@
-# Moonblokz Crypto Library
+# MoonBlokz Crypto Library
 
 [![Crates.io](https://img.shields.io/crates/v/moonblokz-crypto.svg)](https://crates.io/crates/moonblokz-crypto)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Moonblokz Crypto Library provides cryptographic functionalities for signing and verifying messages using different algorithms. It supports Schnorr signatures and BLS signatures, allowing for both single and multi-signature operations.
+The MoonBlokz Crypto Library offers cryptographic functionalities for signing and verifying messages using various algorithms. It supports both Schnorr and BLS signatures, enabling single and multi-signature operations. This library is specifically designed to meet the needs of the MoonBlokz blockchain, which is tailored for radio communication and microcontrollers [https://www.moonblokz.com](https://www.moonblokz.com). For BLS signatures, the library acts as a wrapper around the "bls-bls12_381-bls" crate, while it includes its own implementation for Schnorr signatures.
 
-Detailed information about MoonBlokz and the cryptographic algorithms used can be found in the [Moonblokz article series](https://medium.com/@peter.sallai/moonblokz-series-part-i-building-a-hyper-local-blockchain-2f385b763c65).
+Comprehensive details about MoonBlokz and the cryptographic algorithms used can be found in the [Moonblokz article series](https://medium.com/@peter.sallai/moonblokz-series-part-i-building-a-hyper-local-blockchain-2f385b763c65). Part VI of the series discusses the crypto algorithms utilized.
 
 ---
 
@@ -34,6 +34,8 @@ moonblokz-crypto = { version = "0.9.0", features = ["schnorr-malachite"] }
 
 ## Example
 
+Single signature and verification:
+
 ```rust
 use moonblokz_crypto::{Crypto, CryptoTrait};
 
@@ -43,6 +45,25 @@ fn main() {
     let message = b"Hello, world!";
     let signature = signer.sign(message);
     assert!(signer.verify_signature(message, &signature, signer.public_key()));
+}
+```
+
+Aggregated signature:
+
+```rust
+use moonblokz_crypto::{Crypto, CryptoTrait};
+
+fn main() {
+    let private_key1 = [1u8; 32];
+    let private_key2 = [2u8; 32];
+    let signer1 = Crypto::new(private_key1).expect("Failed to create signer 1");
+    let signer2 = Crypto::new(private_key2).expect("Failed to create signer 2");
+    let message = b"Hello, world!";
+    let sig1 = signer1.multi_sign(message);
+    let sig2 = signer2.multi_sign(message);
+    let aggregated = signer1.aggregate_signatures(&[&sig1, &sig2], message).expect("Aggregation failed");
+    let public_keys = [signer1.public_key(), signer2.public_key()];
+    assert!(signer1.verify_aggregated_signature(message, &aggregated, &public_keys));
 }
 ```
 

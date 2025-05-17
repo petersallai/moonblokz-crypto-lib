@@ -166,7 +166,7 @@ pub trait SignatureTrait: Sized {
 /// A trait representing a single multi-signature (can be aggregated)
 /// Provides methods to create, serialize multi-signatures.
 pub trait MultiSignatureTrait: Sized {
-    /// Creates a new aggregated signature from a byte slice.
+    /// Creates a new aggregated signature from a byte slice. Only multi-signature can be aggregated into an aggregated signature.
     ///
     /// # Arguments
     /// * `bytes` - A slice of bytes representing the aggregated signature.
