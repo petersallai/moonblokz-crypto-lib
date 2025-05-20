@@ -332,9 +332,9 @@ impl Crypto {
         let mut counter = 0u32;
         loop {
             let counter_bytes = counter.to_le_bytes();
-            k0 = BigInt::from_bytes_le(Sign::Plus, &self.tagged_hash(b"nonce", &self.private_key_bytes, &message, &counter_bytes));
+            k0 = BigInt::from_bytes_le(Sign::Plus, &self.tagged_hash(b"nonce", &self.private_key_bytes, &message, &counter_bytes)) % &self.n;
 
-            if k0 > BigInt::zero() && &k0 < &self.n {
+            if k0 > BigInt::zero() {
                 break;
             }
             counter += 1;

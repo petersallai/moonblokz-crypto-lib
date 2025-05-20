@@ -359,10 +359,11 @@ impl Crypto {
         loop {
             let counter_bytes = counter.to_le_bytes();
             k0 = Integer::from(
-                Natural::from_power_of_2_digits_asc(8, self.tagged_hash(b"nonce", &self.private_key_bytes, &message, &counter_bytes).iter().cloned()).unwrap(),
+                Natural::from_power_of_2_digits_asc(8, self.tagged_hash(b"nonce", &self.private_key_bytes, &message, &counter_bytes).iter().cloned()).unwrap()
+                    % &self.n_nat,
             );
 
-            if k0 > 0 && &k0 < &self.n {
+            if k0 > 0 {
                 break;
             }
             counter += 1;
