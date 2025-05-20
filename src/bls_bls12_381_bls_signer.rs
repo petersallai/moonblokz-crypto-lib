@@ -18,7 +18,7 @@ use crate::SignatureTrait;
 
 pub struct PublicKey {
     bls_public_key: BLS_PublicKey,
-    bytes: [u8; 96],
+    bytes: [u8; PUBLIC_KEY_SIZE],
 }
 
 impl PublicKeyTrait for PublicKey {

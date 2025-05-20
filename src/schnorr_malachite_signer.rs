@@ -40,7 +40,7 @@ pub struct Point {
 
 pub struct PublicKey {
     point: Point,
-    bytes: [u8; 32],
+    bytes: [u8; PUBLIC_KEY_SIZE],
 }
 
 impl PublicKeyTrait for PublicKey {
