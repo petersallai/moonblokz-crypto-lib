@@ -478,4 +478,37 @@ mod tests {
         let public_keys = [public_key_1, public_key_3];
         assert!(signer_1.verify_aggregated_signature(message, &aggregated_signature, &public_keys) == false);
     }
+
+    #[test]
+    fn test_multiple_single_signatures() {
+        const TEST_COUNT: usize = 10;
+        //setup test inputs
+        let mut signers = Vec::<Crypto>::new();
+
+        for i in 0..TEST_COUNT {
+            let private_key = [(i + 1) as u8; 32];
+            if let Ok(signer) = Crypto::new(private_key) {
+                signers.push(signer);
+            } else {
+                panic!("Failed to create signer");
+            }
+        }
+
+        let mut signatures = Vec::<Signature>::new();
+        let message = b"Hello, world!";
+
+        //do signing TEST_COUNT times
+        for i in 0..TEST_COUNT {
+            let signer = &signers[i];
+            let signature = signer.sign(message);
+            signatures.push(signature);
+        }
+
+        //verify signatures
+        for i in 0..TEST_COUNT {
+            let signer = &signers[i];
+            let signature = &signatures[i];
+            assert!(signer.verify_signature(message, signature, signer.public_key()));
+        }
+    }
 }
