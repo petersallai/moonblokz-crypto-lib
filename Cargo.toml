@@ -23,8 +23,18 @@ dusk-bytes = { version = "0.1.7", default-features = false,optional = true }
 
 [features]
 default = ["schnorr-num-bigint-dig"]
+
+#Internal feature, used for Schnorr based implementations
 schnorr=["dep:sha2"]
+
+#Internal feature, used for BLS based implementations
 bls=[]
+
+#Use this feature to enable Schnorr implementation based on Malachite bigint library
 schnorr-malachite = ["schnorr","dep:malachite-base", "dep:malachite-nz"]
+
+#Use this feature to enable Schnorr implementation based on a forkd version of num-bigint-dig library
 schnorr-num-bigint-dig = ["schnorr","dep:num-bigint-dig","dep:num-traits"]
+
+#Use this feature to enable BLS implementation. It is a wrapper around the bls12_381-bls library
 bls-bls12_381-bls = ["bls","dep:bls12_381-bls","dep:dusk-bls12_381","dep:dusk-bytes"]
