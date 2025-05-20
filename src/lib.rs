@@ -262,6 +262,17 @@ pub trait CryptoTrait: Sized {
     /// A `MultiSignature` object containing the generated multi-signature.
     fn multi_sign(&self, message: &[u8]) -> MultiSignature;
 
+    /// Verifies a multi-signature against a message and a public key.
+    ///
+    /// # Arguments
+    /// * `message` - A slice of bytes representing the message.
+    /// * `multi_signature` - A reference to the `MultiSignature` to be verified.
+    /// * `public_key` - A reference to the `PublicKey` to verify against.
+    /// # Returns
+    /// * `true` if the multi-signature is valid.
+    /// * `false` otherwise.
+    ///
+    fn verify_multi_signature(&self, message: &[u8], multi_signature: &MultiSignature, public_key: &PublicKey) -> bool;
     /// Verifies a signature against a message and a public key.
     ///
     /// # Arguments

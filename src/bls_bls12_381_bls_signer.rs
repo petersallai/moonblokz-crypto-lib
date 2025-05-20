@@ -169,6 +169,18 @@ impl CryptoTrait for Crypto {
         public_key.bls_public_key.verify(&signature.bls_signature, message).is_ok()
     }
 
+    fn verify_multi_signature(&self, message: &[u8], multi_signature: &MultiSignature, public_key: &PublicKey) -> bool {
+        let mut bls_public_keys = Vec::<BLS_PublicKey>::new();
+        bls_public_keys.push(public_key.bls_public_key);
+
+        let bls_aggregated_public_key = if let Ok(bls_aggregated_public_key) = MultisigPublicKey::aggregate(&bls_public_keys) {
+            bls_aggregated_public_key
+        } else {
+            return false;
+        };
+        bls_aggregated_public_key.verify(&multi_signature.bls_multi_signature, message).is_ok()
+    }
+
     fn aggregate_signatures(&self, signatures: &[&MultiSignature], _: &[u8]) -> Result<AggregatedSignature, CryptoError> {
         if signatures.is_empty() {
             return Err(CryptoError::InvalidSignature);

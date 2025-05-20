@@ -71,42 +71,41 @@ fn main() {
 
 The structure of different structs in this crate are the following:
 ```
-
-              ┌────────────────────────┐                  
-              │                        │                  
-              │  Message, Private Key  │                  
-              │                        │                  
-              └────────────────────────┘                  
-                           │                              
-             ┌────sign─────┴──multi_sign───┐              
-             │                             │              
-             ▼                             ▼              
-┌────────────────────────┐    ┌────────────────────────┐  
-│                        │    │                        ├┐ 
-│       Signature        │    │     MultiSignature     │├┐
-│                        │    │                        │││
-└────────────────────────┘    └┬───────────────────────┘││
-             ▲                 └┬───────────────────────┘│
-             │                  └────────────────────────┘
-             │                               │            
-             │                     aggregate_signatures   
-             │                               ▼            
-             │                  ┌────────────────────────┐
-             │                  │                        │
-     verify_signature           │  AggregatedSignature   │
-             │                  │                        │
-             │                  └────────────────────────┘
-             │                               ▲            
-             │                               │            
-             │              ┌────────────────┘            
-             │      verify_aggregated_signature           
-             │              │                             
-             │ ┌────────────────────────┐                 
-             │ │                        │                 
-             └─│  Message, PublicKey(s) │                 
-               │                        │                 
-               └────────────────────────┘                 
-
+                      ┌────────────────────────┐                  
+                      │                        │                  
+                      │  Message, Private Key  │                  
+                      │                        │                  
+                      └────────────────────────┘                  
+                                   │                              
+             ┌────────────sign─────┴──multi_sign───┐              
+             │                                     │              
+             ▼                                     ▼              
+┌────────────────────────┐            ┌────────────────────────┐  
+│                        │            │                        ├┐ 
+│       Signature        │     ┌─────▶│     MultiSignature     │├┐
+│                        │     │      │                        │││
+└────────────────────────┘     │      └┬───────────────────────┘││
+             ▲                 │       └┬───────────────────────┘│
+             │                 │        └────────────────────────┘
+             │                 │                     │            
+     verify_signature          │           aggregate_signatures   
+             │                 │                     ▼            
+             │                 │        ┌────────────────────────┐
+             │                 │        │                        │
+             │                 │        │  AggregatedSignature   │
+             │                 │        │                        │
+             │                 │        └────────────────────────┘
+             │      verify_multi_signature           ▲            
+             │                 │                     │            
+             │                 │    ┌────────────────┘            
+             │                 │ verify_aggregated_signature      
+             │                 │    │                             
+             │         ┌───────┴────────────────┐                 
+             │         │                        │                 
+             └─────────│ Message, PublicKey(s)  │                 
+                       │                        │                 
+                       └────────────────────────┘                 
+               
 ```
 
 To create a Signature or a MultiSignature, both a message and a private key are required. A Signature is the simpler of the two options and can be verified using the message and a PublicKey. A MultiSignature can also be generated from a message and a private key, allowing multiple signatures to be combined into an AggregatedSignature. This AggregatedSignature can be verified using the original message and a list of PublicKeys.

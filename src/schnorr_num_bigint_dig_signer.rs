@@ -3,6 +3,7 @@ use alloc::vec::Vec;
 use num_bigint_dig::{BigInt, ModInverse, Sign};
 use num_traits::One;
 use num_traits::Zero;
+use num_traits::sign;
 use sha2::digest::FixedOutput;
 use sha2::{Digest, Sha256};
 
@@ -354,6 +355,25 @@ impl Crypto {
         }
         (r, s)
     }
+
+    fn verify_common(&self, message: &[u8], r: &BigInt, s: &BigInt, signature_bytes: [u8; 64], public_key: &PublicKey) -> bool {
+        if r >= &self.p || s >= &self.n {
+            //r value in signature is not less than the elliptic curve field size or s value in signature is not less than the number of points on the elliptic curve
+            return false;
+        }
+
+        let e = BigInt::from_bytes_le(Sign::Plus, &self.tagged_hash(b"challenge", &signature_bytes[0..32], &public_key.bytes, message)) % &self.n;
+
+        let point1 = self.multiply(s, &self.g);
+        let point2 = self.multiply(&(&self.n - e), &public_key.point);
+        let point3 = self.add(&point1, &point2);
+
+        if &point3.x == r {
+            return true;
+        } else {
+            return false;
+        }
+    }
 }
 
 impl CryptoTrait for Crypto {
@@ -421,26 +441,17 @@ impl CryptoTrait for Crypto {
     }
 
     fn verify_signature(&self, message: &[u8], signature: &Signature, public_key: &PublicKey) -> bool {
-        let public_key_point: &Point = &self.public_key.point;
-
         let r = &signature.r;
         let s = &signature.s;
+        let signature_bytes = signature.bytes;
+        self.verify_common(message, r, s, signature_bytes, public_key)
+    }
 
-        if r >= &self.p || s >= &self.n {
-            //r value in signature is not less than the elliptic curve field size or s value in signature is not less than the number of points on the elliptic curve
-            return false;
-        }
-
-        let e = BigInt::from_bytes_le(Sign::Plus, &self.tagged_hash(b"challenge", &signature.bytes[0..32], &public_key.bytes, message)) % &self.n;
-        let point1 = self.multiply(s, &self.g);
-        let point2 = self.multiply(&(&self.n - e), &public_key_point);
-        let point3 = self.add(&point1, &point2);
-
-        if &point3.x == r {
-            return true;
-        } else {
-            return false;
-        }
+    fn verify_multi_signature(&self, message: &[u8], multi_signature: &MultiSignature, public_key: &PublicKey) -> bool {
+        let r = &multi_signature.r;
+        let s = &multi_signature.s;
+        let signature_bytes = multi_signature.bytes;
+        self.verify_common(message, r, s, signature_bytes, public_key)
     }
 
     fn aggregate_signatures(&self, signatures: &[&MultiSignature], message: &[u8]) -> Result<AggregatedSignature, CryptoError> {
