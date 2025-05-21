@@ -545,6 +545,10 @@ impl CryptoTrait for Crypto {
     }
 
     fn verify_aggregated_signature(&self, message: &[u8], aggregated_signature: &AggregatedSignature, public_keys: &[&PublicKey]) -> bool {
+        if aggregated_signature.get_count() != public_keys.len() {
+            return false;
+        }
+
         //calculate the sum of r values to use in the initial seed of the random number generation
         let mut r_sum = Natural::from(0u32);
         for r in aggregated_signature.r.iter() {

@@ -207,6 +207,10 @@ impl CryptoTrait for Crypto {
     }
 
     fn verify_aggregated_signature(&self, message: &[u8], aggregated_signature: &AggregatedSignature, public_keys: &[&PublicKey]) -> bool {
+        if aggregated_signature.get_count() != public_keys.len() {
+            return false;
+        }
+
         let mut bls_public_keys = Vec::<BLS_PublicKey>::new();
         for i in 0..public_keys.len() {
             bls_public_keys.push(public_keys[i].bls_public_key);
