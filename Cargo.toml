@@ -15,7 +15,7 @@ categories = ["crypto"]
 sha2 = { version = "0.10", default-features = false,optional = true}
 malachite-base = {version="0.6", default-features=false,optional = true}
 malachite-nz = {version="0.6", default-features=false,optional = true,features = ["32_bit_limbs"]}
-num-bigint-dig = {git="https://github.com/petersallai/num-bigint.git", default-features=false,optional = true}
+num-bigint-dig = {git="https://github.com/petersallai/num-bigint.git", default-features=false,optional = true,features = ["lazy_static"] }
 num-traits = { version = "0.2", default-features = false, optional = true }
 bls12_381-bls={version = "0.5", default-features = false,optional = true}
 dusk-bls12_381 = { version = "0.14", default-features = false, features = ["alloc", "pairings", "zeroize"],optional = true }
