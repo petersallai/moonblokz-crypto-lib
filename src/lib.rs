@@ -343,26 +343,6 @@ mod tests {
     }
 
     #[test]
-    fn test_serialize() {
-        let private_key = [2u8; PRIVATE_KEY_SIZE];
-        let signer = if let Ok(signer) = Crypto::new(private_key) {
-            signer
-        } else {
-            panic!("Failed to create signer")
-        };
-        let public_key = signer.public_key();
-        let serialized_public_key = public_key.serialize();
-        let deserialized_public_key_result = PublicKey::new(serialized_public_key);
-        let deserialized_public_key = match deserialized_public_key_result {
-            Ok(key) => key,
-            Err(_) => panic!("Failed to deserialize public key"),
-        };
-        let message = b"Hello, world!";
-        let signature = signer.sign(message);
-        assert!(signer.verify_signature(message, &signature, &deserialized_public_key));
-    }
-
-    #[test]
     fn test_aggregate() {
         let private_key_1 = [1u8; PRIVATE_KEY_SIZE];
         let private_key_2 = [2u8; PRIVATE_KEY_SIZE];
@@ -521,5 +501,205 @@ mod tests {
             let signature = &signatures[i];
             assert!(signer.verify_signature(message, signature, signer.public_key()));
         }
+    }
+
+    #[test]
+    fn test_signature_serialization() {
+        let private_key = [1u8; PRIVATE_KEY_SIZE];
+        let signer = if let Ok(signer) = Crypto::new(private_key) {
+            signer
+        } else {
+            panic!("Failed to create signer")
+        };
+        let message = b"Hello, world!";
+        let signature = signer.sign(message);
+        let serialized_signature = signature.serialize();
+        let deserialized_signature_result = Signature::new(serialized_signature);
+        let deserialized_signature = match deserialized_signature_result {
+            Ok(sig) => sig,
+            Err(_) => panic!("Failed to deserialize signature"),
+        };
+        assert!(signer.verify_signature(message, &deserialized_signature, signer.public_key()));
+    }
+
+    #[test]
+    fn test_signature_deserialization_negative() {
+        let invalid_signature = [0u8; SIGNATURE_SIZE - 1];
+        assert!(Signature::new(&invalid_signature).is_err());
+    }
+
+    #[test]
+    fn test_multi_signature_serialization() {
+        let private_key = [1u8; PRIVATE_KEY_SIZE];
+        let signer = if let Ok(signer) = Crypto::new(private_key) {
+            signer
+        } else {
+            panic!("Failed to create signer")
+        };
+        let message = b"Hello, world!";
+        let multi_signature = signer.multi_sign(message);
+        let serialized_multi_signature = multi_signature.serialize();
+        let deserialized_multi_signature_result = MultiSignature::new(serialized_multi_signature);
+        let deserialized_multi_signature = match deserialized_multi_signature_result {
+            Ok(sig) => sig,
+            Err(_) => panic!("Failed to deserialize multi-signature"),
+        };
+        assert!(signer.verify_multi_signature(message, &deserialized_multi_signature, signer.public_key()));
+    }
+
+    #[test]
+    fn test_multi_signature_deserialization_negative() {
+        let invalid_multi_signature = [0u8; MULTI_SIGNATURE_SIZE - 1];
+        assert!(MultiSignature::new(&invalid_multi_signature).is_err());
+    }
+
+    #[test]
+    fn test_aggregated_signature_serialization() {
+        let private_key = [1u8; PRIVATE_KEY_SIZE];
+        let signer = if let Ok(signer) = Crypto::new(private_key) {
+            signer
+        } else {
+            panic!("Failed to create signer")
+        };
+        let message = b"Hello, world!";
+        let signature = signer.multi_sign(message);
+        let aggregated_signature_result = signer.aggregate_signatures(&[&signature], message);
+        let aggregated_signature = match aggregated_signature_result {
+            Ok(signature) => signature,
+            Err(_) => panic!("Failed to aggregate signature"),
+        };
+        let serialized_aggregated_signature = aggregated_signature.serialize();
+        let deserialized_aggregated_signature_result = AggregatedSignature::new(&serialized_aggregated_signature);
+        let deserialized_aggregated_signature = match deserialized_aggregated_signature_result {
+            Ok(sig) => sig,
+            Err(_) => panic!("Failed to deserialize aggregated signature"),
+        };
+        assert!(signer.verify_aggregated_signature(message, &deserialized_aggregated_signature, &[signer.public_key()]));
+    }
+
+    #[test]
+    fn test_aggregated_signature_deserialization_negative() {
+        let invalid_aggregated_signature = [0u8; AGGREGATED_SIGNATURE_CONSTANT_SIZE - 1];
+        assert!(AggregatedSignature::new(&invalid_aggregated_signature).is_err());
+    }
+
+    #[test]
+    fn test_aggregated_signature_count() {
+        let private_key = [1u8; PRIVATE_KEY_SIZE];
+        let signer = if let Ok(signer) = Crypto::new(private_key) {
+            signer
+        } else {
+            panic!("Failed to create signer")
+        };
+        let message = b"Hello, world!";
+        let signature = signer.multi_sign(message);
+        let aggregated_signature_result = signer.aggregate_signatures(&[&signature], message);
+        let aggregated_signature = match aggregated_signature_result {
+            Ok(signature) => signature,
+            Err(_) => panic!("Failed to aggregate signature"),
+        };
+        assert_eq!(aggregated_signature.get_count(), 1);
+    }
+
+    #[test]
+    fn test_aggregated_signature_count_multiple() {
+        let private_key = [1u8; PRIVATE_KEY_SIZE];
+        let signer = if let Ok(signer) = Crypto::new(private_key) {
+            signer
+        } else {
+            panic!("Failed to create signer")
+        };
+        let message = b"Hello, world!";
+        let signature1 = signer.multi_sign(message);
+        let signature2 = signer.multi_sign(message);
+        let aggregated_signature_result = signer.aggregate_signatures(&[&signature1, &signature2], message);
+        let aggregated_signature = match aggregated_signature_result {
+            Ok(signature) => signature,
+            Err(_) => panic!("Failed to aggregate signature"),
+        };
+        assert_eq!(aggregated_signature.get_count(), 2);
+    }
+
+    #[test]
+    fn test_public_key_serialization() {
+        let private_key = [1u8; PRIVATE_KEY_SIZE];
+        let signer = if let Ok(signer) = Crypto::new(private_key) {
+            signer
+        } else {
+            panic!("Failed to create signer")
+        };
+        let public_key = signer.public_key();
+        let serialized_public_key = public_key.serialize();
+        let deserialized_public_key_result = PublicKey::new(serialized_public_key);
+        let deserialized_public_key = match deserialized_public_key_result {
+            Ok(key) => key,
+            Err(_) => panic!("Failed to deserialize public key"),
+        };
+        assert_eq!(public_key.serialize(), deserialized_public_key.serialize());
+    }
+
+    #[test]
+    fn test_public_key_deserialization_negative() {
+        let invalid_public_key = [0u8; PUBLIC_KEY_SIZE - 1];
+        assert!(PublicKey::new(&invalid_public_key).is_err());
+    }
+
+    #[test]
+    fn test_aggregate_signature_empty() {
+        let private_key = [1u8; PRIVATE_KEY_SIZE];
+        let signer = if let Ok(signer) = Crypto::new(private_key) {
+            signer
+        } else {
+            panic!("Failed to create signer")
+        };
+        let message = b"Hello, world!";
+        let aggregated_signature_result = signer.aggregate_signatures(&[], message);
+        assert!(aggregated_signature_result.is_err());
+    }
+
+    #[test]
+    fn test_multi_signature_negative_verify_message_change() {
+        let private_key = [1u8; PRIVATE_KEY_SIZE];
+        let signer = if let Ok(signer) = Crypto::new(private_key) {
+            signer
+        } else {
+            panic!("Failed to create signer")
+        };
+        let public_key = signer.public_key();
+        let message = b"Hello, world!";
+        let message2 = b"Hello, world2!";
+        let multi_signature = signer.multi_sign(message);
+        assert!(signer.verify_multi_signature(message2, &multi_signature, public_key) == false);
+    }
+
+    #[test]
+    fn test_aggregated_signature_empty_public_keys() {
+        let private_key_1 = [1u8; PRIVATE_KEY_SIZE];
+        let private_key_2 = [2u8; PRIVATE_KEY_SIZE];
+
+        let signer_1 = if let Ok(signer) = Crypto::new(private_key_1) {
+            signer
+        } else {
+            panic!("Failed to create signer 1")
+        };
+
+        let signer_2 = if let Ok(signer) = Crypto::new(private_key_2) {
+            signer
+        } else {
+            panic!("Failed to create signer 2")
+        };
+
+        let message = b"Hello, world!";
+        let signature_1 = signer_1.multi_sign(message);
+        let signature_2 = signer_2.multi_sign(message);
+
+        let aggregated_signature_result = signer_1.aggregate_signatures(&[&signature_1, &signature_2], message);
+
+        let aggregated_signature = match aggregated_signature_result {
+            Ok(signature) => signature,
+            Err(_) => panic!("Failed to aggregate signature"),
+        };
+
+        assert!(signer_1.verify_aggregated_signature(message, &aggregated_signature, &[]) == false);
     }
 }
