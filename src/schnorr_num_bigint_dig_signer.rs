@@ -3,7 +3,6 @@ use alloc::vec::Vec;
 use num_bigint_dig::{BigInt, ModInverse, Sign};
 use num_traits::One;
 use num_traits::Zero;
-use num_traits::sign;
 use sha2::digest::FixedOutput;
 use sha2::{Digest, Sha256};
 
