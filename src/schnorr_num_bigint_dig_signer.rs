@@ -453,7 +453,7 @@ impl CryptoTrait for Crypto {
         self.verify_common(message, r, s, signature_bytes, public_key)
     }
 
-    fn aggregate_signatures(&self, signatures: &[&MultiSignature], message: &[u8]) -> Result<AggregatedSignature, CryptoError> {
+    fn aggregate_signatures(&self, signatures: Vec<&MultiSignature>, message: &[u8]) -> Result<AggregatedSignature, CryptoError> {
         let mut r = Vec::<BigInt>::new();
         let mut r_bytes = Vec::<[u8; 32]>::new();
         let mut s = BigInt::zero();
@@ -488,7 +488,7 @@ impl CryptoTrait for Crypto {
         Ok(AggregatedSignature { r, r_bytes, s })
     }
 
-    fn verify_aggregated_signature(&self, message: &[u8], aggregated_signature: &AggregatedSignature, public_keys: &[&PublicKey]) -> bool {
+    fn verify_aggregated_signature(&self, message: &[u8], aggregated_signature: &AggregatedSignature, public_keys: Vec<&PublicKey>) -> bool {
         if aggregated_signature.get_count() != public_keys.len() {
             return false;
         }

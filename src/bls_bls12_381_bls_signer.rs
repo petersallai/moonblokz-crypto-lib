@@ -181,7 +181,7 @@ impl CryptoTrait for Crypto {
         bls_aggregated_public_key.verify(&multi_signature.bls_multi_signature, message).is_ok()
     }
 
-    fn aggregate_signatures(&self, signatures: &[&MultiSignature], _: &[u8]) -> Result<AggregatedSignature, CryptoError> {
+    fn aggregate_signatures(&self, signatures: Vec<&MultiSignature>, message: &[u8]) -> Result<AggregatedSignature, CryptoError> {
         if signatures.is_empty() {
             return Err(CryptoError::InvalidSignature);
         };
@@ -206,7 +206,7 @@ impl CryptoTrait for Crypto {
         })
     }
 
-    fn verify_aggregated_signature(&self, message: &[u8], aggregated_signature: &AggregatedSignature, public_keys: &[&PublicKey]) -> bool {
+    fn verify_aggregated_signature(&self, message: &[u8], aggregated_signature: &AggregatedSignature, public_keys: Vec<&PublicKey>) -> bool {
         if aggregated_signature.get_count() != public_keys.len() {
             return false;
         }

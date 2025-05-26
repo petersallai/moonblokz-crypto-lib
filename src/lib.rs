@@ -288,30 +288,31 @@ pub trait CryptoTrait: Sized {
     /// Aggregates multiple individual multi-signatures into a single aggregated signature.
     ///
     /// # Arguments
-    /// * `signatures` - A slice of references to `MultiSignature` objects to be aggregated.
+    /// * `signatures` - A Vec of references to `MultiSignature` objects to be aggregated.
     /// * `message` - A slice of bytes representing the message that was signed.
     ///
     /// # Returns
     /// * `Ok(AggregatedSignature)` if aggregation is successful.
     /// * `Err(CryptoError)` if aggregation fails.
-    fn aggregate_signatures(&self, signatures: &[&MultiSignature], message: &[u8]) -> Result<AggregatedSignature, CryptoError>;
+    fn aggregate_signatures(&self, signatures: Vec<&MultiSignature>, message: &[u8]) -> Result<AggregatedSignature, CryptoError>;
 
     /// Verifies an aggregated signature against a message and a set of public keys.
     ///
     /// # Arguments
     /// * `message` - A slice of bytes representing the message.
     /// * `aggregated_signature` - A reference to the `AggregatedSignature` to be verified.
-    /// * `public_keys` - A slice of references to `PublicKey` objects to verify against.
+    /// * `public_keys` - A Vec of references to `PublicKey` objects to verify against.
     ///
     /// # Returns
     /// * `true` if the aggregated signature is valid.
     /// * `false` otherwise.
-    fn verify_aggregated_signature(&self, message: &[u8], aggregated_signature: &AggregatedSignature, public_keys: &[&PublicKey]) -> bool;
+    fn verify_aggregated_signature(&self, message: &[u8], aggregated_signature: &AggregatedSignature, public_keys: Vec<&PublicKey>) -> bool;
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec;
 
     #[test]
     fn test_basic() {
@@ -364,15 +365,14 @@ mod tests {
         let signature_1 = signer_1.multi_sign(message);
         let signature_2 = signer_2.multi_sign(message);
 
-        let aggregated_signature_result = signer_1.aggregate_signatures(&[&signature_1, &signature_2], message);
+        let aggregated_signature_result = signer_1.aggregate_signatures(vec![&signature_1, &signature_2], message);
 
         let aggregated_signature = match aggregated_signature_result {
             Ok(signature) => signature,
             Err(_) => panic!("Failed to aggregate signature"),
         };
 
-        let public_keys = [public_key_1, public_key_2];
-        assert!(signer_1.verify_aggregated_signature(message, &aggregated_signature, &public_keys));
+        assert!(signer_1.verify_aggregated_signature(message, &aggregated_signature, vec![public_key_1, public_key_2]));
     }
 
     #[test]
@@ -388,13 +388,12 @@ mod tests {
         let public_key_1 = signer_1.public_key();
         let message = b"Hello, world!";
         let signature_1 = signer_1.multi_sign(message);
-        let aggregated_signature_result = signer_1.aggregate_signatures(&[&signature_1], message);
+        let aggregated_signature_result = signer_1.aggregate_signatures(vec![&signature_1], message);
         let aggregated_signature = match aggregated_signature_result {
             Ok(signature) => signature,
             Err(_) => panic!("Failed to aggregate signature"),
         };
-        let public_keys = [public_key_1];
-        assert!(signer_1.verify_aggregated_signature(message, &aggregated_signature, &public_keys));
+        assert!(signer_1.verify_aggregated_signature(message, &aggregated_signature, vec![public_key_1]));
     }
 
     #[test]
@@ -419,15 +418,14 @@ mod tests {
         let signature_1 = signer_1.multi_sign(message);
         let signature_2 = signer_2.multi_sign(message);
         let message2 = b"Hello, world2!";
-        let aggregated_signature_result = signer_1.aggregate_signatures(&[&signature_1, &signature_2], message);
+        let aggregated_signature_result = signer_1.aggregate_signatures(vec![&signature_1, &signature_2], message);
 
         let aggregated_signature = match aggregated_signature_result {
             Ok(signature) => signature,
             Err(_) => panic!("Failed to aggregate signature"),
         };
 
-        let public_keys = [public_key_1, public_key_2];
-        assert!(signer_1.verify_aggregated_signature(message2, &aggregated_signature, &public_keys) == false);
+        assert!(signer_1.verify_aggregated_signature(message2, &aggregated_signature, vec![public_key_1, public_key_2]) == false);
     }
 
     #[test]
@@ -459,15 +457,14 @@ mod tests {
         let message = b"Hello, world!";
         let signature_1 = signer_1.multi_sign(message);
         let signature_2 = signer_2.multi_sign(message);
-        let aggregated_signature_result = signer_1.aggregate_signatures(&[&signature_1, &signature_2], message);
+        let aggregated_signature_result = signer_1.aggregate_signatures(vec![&signature_1, &signature_2], message);
 
         let aggregated_signature = match aggregated_signature_result {
             Ok(signature) => signature,
             Err(_) => panic!("Failed to aggregate signature"),
         };
 
-        let public_keys = [public_key_1, public_key_3];
-        assert!(signer_1.verify_aggregated_signature(message, &aggregated_signature, &public_keys) == false);
+        assert!(signer_1.verify_aggregated_signature(message, &aggregated_signature, vec![public_key_1, public_key_3]) == false);
     }
 
     #[test]
@@ -563,7 +560,7 @@ mod tests {
         };
         let message = b"Hello, world!";
         let signature = signer.multi_sign(message);
-        let aggregated_signature_result = signer.aggregate_signatures(&[&signature], message);
+        let aggregated_signature_result = signer.aggregate_signatures(vec![&signature], message);
         let aggregated_signature = match aggregated_signature_result {
             Ok(signature) => signature,
             Err(_) => panic!("Failed to aggregate signature"),
@@ -574,7 +571,7 @@ mod tests {
             Ok(sig) => sig,
             Err(_) => panic!("Failed to deserialize aggregated signature"),
         };
-        assert!(signer.verify_aggregated_signature(message, &deserialized_aggregated_signature, &[signer.public_key()]));
+        assert!(signer.verify_aggregated_signature(message, &deserialized_aggregated_signature, vec![signer.public_key()]));
     }
 
     #[test]
@@ -593,7 +590,7 @@ mod tests {
         };
         let message = b"Hello, world!";
         let signature = signer.multi_sign(message);
-        let aggregated_signature_result = signer.aggregate_signatures(&[&signature], message);
+        let aggregated_signature_result = signer.aggregate_signatures(vec![&signature], message);
         let aggregated_signature = match aggregated_signature_result {
             Ok(signature) => signature,
             Err(_) => panic!("Failed to aggregate signature"),
@@ -612,7 +609,7 @@ mod tests {
         let message = b"Hello, world!";
         let signature1 = signer.multi_sign(message);
         let signature2 = signer.multi_sign(message);
-        let aggregated_signature_result = signer.aggregate_signatures(&[&signature1, &signature2], message);
+        let aggregated_signature_result = signer.aggregate_signatures(vec![&signature1, &signature2], message);
         let aggregated_signature = match aggregated_signature_result {
             Ok(signature) => signature,
             Err(_) => panic!("Failed to aggregate signature"),
@@ -653,7 +650,7 @@ mod tests {
             panic!("Failed to create signer")
         };
         let message = b"Hello, world!";
-        let aggregated_signature_result = signer.aggregate_signatures(&[], message);
+        let aggregated_signature_result = signer.aggregate_signatures(vec![], message);
         assert!(aggregated_signature_result.is_err());
     }
 
@@ -693,13 +690,13 @@ mod tests {
         let signature_1 = signer_1.multi_sign(message);
         let signature_2 = signer_2.multi_sign(message);
 
-        let aggregated_signature_result = signer_1.aggregate_signatures(&[&signature_1, &signature_2], message);
+        let aggregated_signature_result = signer_1.aggregate_signatures(vec![&signature_1, &signature_2], message);
 
         let aggregated_signature = match aggregated_signature_result {
             Ok(signature) => signature,
             Err(_) => panic!("Failed to aggregate signature"),
         };
 
-        assert!(signer_1.verify_aggregated_signature(message, &aggregated_signature, &[]) == false);
+        assert!(signer_1.verify_aggregated_signature(message, &aggregated_signature, Vec::new()) == false);
     }
 }
