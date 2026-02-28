@@ -1,5 +1,4 @@
-extern crate alloc;
-use alloc::vec::Vec;
+use core::mem::MaybeUninit;
 use bls12_381_bls::{MultisigPublicKey, MultisigSignature as BLS_MultiSignature, PublicKey as BLS_PublicKey, SecretKey, Signature as BLS_Signature};
 use dusk_bytes::Serializable;
 
@@ -11,6 +10,7 @@ use crate::PRIVATE_KEY_SIZE;
 use crate::PUBLIC_KEY_SIZE;
 use crate::PublicKeyTrait;
 use crate::SIGNATURE_SIZE;
+use crate::MAX_AGGREGATED_SIGNATURES;
 
 use crate::CryptoError;
 use crate::CryptoTrait;
@@ -115,12 +115,20 @@ impl AggregatedSignatureTrait for AggregatedSignature {
         })
     }
 
-    fn serialize(&self) -> Vec<u8> {
-        return self.bytes.to_vec();
+    fn serialize(&self, out: &mut [u8]) -> Result<usize, CryptoError> {
+        if out.len() < AGGREGATED_SIGNATURE_CONSTANT_SIZE {
+            return Err(CryptoError::InvalidSignature);
+        }
+        out[0..AGGREGATED_SIGNATURE_CONSTANT_SIZE].copy_from_slice(&self.bytes);
+        Ok(AGGREGATED_SIGNATURE_CONSTANT_SIZE)
     }
 
     fn get_count(&self) -> usize {
         self.count
+    }
+
+    fn serialized_len(&self) -> usize {
+        AGGREGATED_SIGNATURE_CONSTANT_SIZE
     }
 }
 
@@ -170,8 +178,7 @@ impl CryptoTrait for Crypto {
     }
 
     fn verify_multi_signature(&self, message: &[u8], multi_signature: &MultiSignature, public_key: &PublicKey) -> bool {
-        let mut bls_public_keys = Vec::<BLS_PublicKey>::new();
-        bls_public_keys.push(public_key.bls_public_key);
+        let bls_public_keys = [public_key.bls_public_key.clone()];
 
         let bls_aggregated_public_key = if let Ok(bls_aggregated_public_key) = MultisigPublicKey::aggregate(&bls_public_keys) {
             bls_aggregated_public_key
@@ -181,19 +188,25 @@ impl CryptoTrait for Crypto {
         bls_aggregated_public_key.verify(&multi_signature.bls_multi_signature, message).is_ok()
     }
 
-    fn aggregate_signatures(&self, signatures: Vec<&MultiSignature>, message: &[u8]) -> Result<AggregatedSignature, CryptoError> {
-        if signatures.is_empty() {
+    fn aggregate_signatures(&self, signatures: &[&MultiSignature], _message: &[u8]) -> Result<AggregatedSignature, CryptoError> {
+        if signatures.is_empty() || signatures.len() > MAX_AGGREGATED_SIGNATURES {
             return Err(CryptoError::InvalidSignature);
-        };
-
-        let first_signature = signatures[0].bls_multi_signature.clone();
-
-        let mut bls_multi_signatures = Vec::<BLS_MultiSignature>::new();
-        for i in 1..signatures.len() {
-            bls_multi_signatures.push(signatures[i].bls_multi_signature);
         }
 
-        let aggregated_bls_signature = first_signature.aggregate(&bls_multi_signatures);
+        let first_signature = signatures[0].bls_multi_signature.clone();
+        let aggregated_bls_signature = if signatures.len() > 1 {
+            let mut bls_multi_signatures: [MaybeUninit<BLS_MultiSignature>; MAX_AGGREGATED_SIGNATURES] =
+                unsafe { MaybeUninit::uninit().assume_init() };
+            for (index, signature) in signatures.iter().enumerate().skip(1) {
+                bls_multi_signatures[index - 1].write(signature.bls_multi_signature.clone());
+            }
+            let others_len = signatures.len() - 1;
+            let others_ptr = bls_multi_signatures.as_ptr() as *const BLS_MultiSignature;
+            let others = unsafe { core::slice::from_raw_parts(others_ptr, others_len) };
+            first_signature.aggregate(others)
+        } else {
+            first_signature
+        };
 
         let mut aggregated_signature_bytes = [0; AGGREGATED_SIGNATURE_CONSTANT_SIZE];
         aggregated_signature_bytes[0..2].copy_from_slice(&(signatures.len() as u16).to_le_bytes());
@@ -206,15 +219,18 @@ impl CryptoTrait for Crypto {
         })
     }
 
-    fn verify_aggregated_signature(&self, message: &[u8], aggregated_signature: &AggregatedSignature, public_keys: Vec<&PublicKey>) -> bool {
-        if aggregated_signature.get_count() != public_keys.len() {
+    fn verify_aggregated_signature(&self, message: &[u8], aggregated_signature: &AggregatedSignature, public_keys: &[&PublicKey]) -> bool {
+        if aggregated_signature.get_count() != public_keys.len() || public_keys.len() > MAX_AGGREGATED_SIGNATURES {
             return false;
         }
 
-        let mut bls_public_keys = Vec::<BLS_PublicKey>::new();
-        for i in 0..public_keys.len() {
-            bls_public_keys.push(public_keys[i].bls_public_key);
+        let mut bls_public_keys: [MaybeUninit<BLS_PublicKey>; MAX_AGGREGATED_SIGNATURES] =
+            unsafe { MaybeUninit::uninit().assume_init() };
+        for (index, public_key) in public_keys.iter().enumerate() {
+            bls_public_keys[index].write(public_key.bls_public_key.clone());
         }
+        let keys_ptr = bls_public_keys.as_ptr() as *const BLS_PublicKey;
+        let bls_public_keys = unsafe { core::slice::from_raw_parts(keys_ptr, public_keys.len()) };
 
         let bls_aggregated_public_key = if let Ok(bls_aggregated_public_key) = MultisigPublicKey::aggregate(&bls_public_keys) {
             bls_aggregated_public_key

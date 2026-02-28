@@ -22,7 +22,7 @@ dusk-bls12_381 = { version = "0.14", default-features = false, features = ["allo
 dusk-bytes = { version = "0.1.7", default-features = false,optional = true }
 
 [features]
-default = ["schnorr-num-bigint-dig"]
+default = ["schnorr-malachite"]
 
 #Internal feature, used for Schnorr based implementations
 schnorr=["dep:sha2"]

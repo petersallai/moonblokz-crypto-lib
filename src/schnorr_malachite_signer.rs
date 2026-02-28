@@ -1,5 +1,4 @@
-extern crate alloc;
-use alloc::vec::Vec;
+use core::cmp::min;
 use malachite_base::num::arithmetic::traits::ModInverse;
 use malachite_base::num::arithmetic::traits::*;
 use malachite_base::num::conversion::traits::FromStringBase;
@@ -21,6 +20,7 @@ use crate::PRIVATE_KEY_SIZE;
 use crate::PUBLIC_KEY_SIZE;
 use crate::PublicKeyTrait;
 use crate::SIGNATURE_SIZE;
+use crate::MAX_AGGREGATED_SIGNATURES;
 
 use crate::CryptoError;
 use crate::CryptoTrait;
@@ -193,8 +193,8 @@ impl MultiSignature {
 }
 
 pub struct AggregatedSignature {
-    r: Vec<Natural>,
-    r_bytes: Vec<[u8; 32]>,
+    count: usize,
+    r_bytes: [[u8; 32]; MAX_AGGREGATED_SIGNATURES],
     s: Natural,
 }
 
@@ -205,41 +205,55 @@ impl AggregatedSignatureTrait for AggregatedSignature {
         }
 
         let count_slice: [u8; 2] = bytes[0..2].try_into().map_err(|_| CryptoError::InvalidSignature)?;
-        let count = u16::from_le_bytes(count_slice);
+        let count = u16::from_le_bytes(count_slice) as usize;
+        if count > MAX_AGGREGATED_SIGNATURES {
+            return Err(CryptoError::InvalidSignature);
+        }
 
-        if bytes.len() < AGGREGATED_SIGNATURE_VARIABLE_SIZE * count as usize + AGGREGATED_SIGNATURE_CONSTANT_SIZE {
+        if bytes.len() < AGGREGATED_SIGNATURE_VARIABLE_SIZE * count + AGGREGATED_SIGNATURE_CONSTANT_SIZE {
             return Err(CryptoError::InvalidSignature);
         }
 
         let s_bytes: [u8; 32] = bytes[2..34].try_into().map_err(|_| CryptoError::InvalidSignature)?;
         let s = Natural::from_power_of_2_digits_asc(8, s_bytes.iter().cloned()).unwrap();
 
-        let mut r = Vec::<Natural>::new();
-        let mut r_bytes = Vec::<[u8; 32]>::new();
+        let mut r_bytes = [[0u8; 32]; MAX_AGGREGATED_SIGNATURES];
 
         for i in 0..count {
             let start = 34 + i as usize * 32;
             let end = start + 32;
-            r_bytes.push(bytes[start..end].try_into().map_err(|_| CryptoError::InvalidSignature)?);
-            let r_i = Natural::from_power_of_2_digits_asc(8, bytes[start..end].iter().cloned()).unwrap();
-            r.push(r_i);
+            r_bytes[i] = bytes[start..end].try_into().map_err(|_| CryptoError::InvalidSignature)?;
         }
 
-        Ok(AggregatedSignature { r, r_bytes, s })
+        Ok(AggregatedSignature { count, r_bytes, s })
     }
 
-    fn serialize(&self) -> Vec<u8> {
-        let mut result = Vec::<u8>::with_capacity(AGGREGATED_SIGNATURE_CONSTANT_SIZE + AGGREGATED_SIGNATURE_VARIABLE_SIZE * self.r.len());
-        result.extend_from_slice(&(self.r.len() as u16).to_le_bytes());
-        result.extend_from_slice(&self.s.to_power_of_2_digits_asc(8));
-        for r_byte in &self.r_bytes {
-            result.extend_from_slice(r_byte);
+    fn serialize(&self, out: &mut [u8]) -> Result<usize, CryptoError> {
+        let total_len = AGGREGATED_SIGNATURE_CONSTANT_SIZE + AGGREGATED_SIGNATURE_VARIABLE_SIZE * self.count;
+        if out.len() < total_len {
+            return Err(CryptoError::InvalidSignature);
         }
-        result
+
+        out[0..2].copy_from_slice(&(self.count as u16).to_le_bytes());
+        let s_bytes = self.s.to_power_of_2_digits_asc(8);
+        let mut s_fixed = [0u8; 32];
+        let s_len = min(s_bytes.len(), 32);
+        s_fixed[..s_len].copy_from_slice(&s_bytes[..s_len]);
+        out[2..34].copy_from_slice(&s_fixed);
+        for i in 0..self.count {
+            let start = 34 + i * 32;
+            let end = start + 32;
+            out[start..end].copy_from_slice(&self.r_bytes[i]);
+        }
+        Ok(total_len)
     }
 
     fn get_count(&self) -> usize {
-        self.r.len()
+        self.count
+    }
+
+    fn serialized_len(&self) -> usize {
+        AGGREGATED_SIGNATURE_CONSTANT_SIZE + AGGREGATED_SIGNATURE_VARIABLE_SIZE * self.count
     }
 }
 
@@ -505,22 +519,20 @@ impl CryptoTrait for Crypto {
         self.verify_common(message, r, s, signature_bytes, public_key)
     }
 
-    fn aggregate_signatures(&self, signatures: Vec<&MultiSignature>, message: &[u8]) -> Result<AggregatedSignature, CryptoError> {
-        let mut r = Vec::<Natural>::new();
-        let mut r_bytes = Vec::<[u8; 32]>::new();
+    fn aggregate_signatures(&self, signatures: &[&MultiSignature], message: &[u8]) -> Result<AggregatedSignature, CryptoError> {
+        if signatures.is_empty() || signatures.len() > MAX_AGGREGATED_SIGNATURES {
+            return Err(CryptoError::InvalidSignature);
+        }
+
+        let mut r_bytes = [[0u8; 32]; MAX_AGGREGATED_SIGNATURES];
         let mut s = Natural::from(0u32);
 
         //calculate the sum of r values to use in the initial seed of the random number generation
         let mut r_sum = Natural::from(0u32);
 
-        if signatures.is_empty() {
-            return Err(CryptoError::InvalidSignature);
-        };
-
-        for signature in signatures.iter() {
+        for (index, signature) in signatures.iter().enumerate() {
             r_sum = (r_sum + Natural::saturating_from(&signature.r)) % &self.p_nat;
-            r.push(Natural::saturating_from(&signature.r));
-            r_bytes.push(signature.bytes[0..32].try_into().unwrap());
+            r_bytes[index] = signature.bytes[0..32].try_into().unwrap();
         }
 
         let r_sum_bytes = &r_sum.to_power_of_2_digits_asc(8);
@@ -541,18 +553,23 @@ impl CryptoTrait for Crypto {
             s = (s + &Natural::saturating_from(&signature.s) * &random_number) % &self.n_nat;
             i += 1;
         }
-        Ok(AggregatedSignature { r, r_bytes, s })
+        Ok(AggregatedSignature {
+            count: signatures.len(),
+            r_bytes,
+            s,
+        })
     }
 
-    fn verify_aggregated_signature(&self, message: &[u8], aggregated_signature: &AggregatedSignature, public_keys: Vec<&PublicKey>) -> bool {
+    fn verify_aggregated_signature(&self, message: &[u8], aggregated_signature: &AggregatedSignature, public_keys: &[&PublicKey]) -> bool {
         if aggregated_signature.get_count() != public_keys.len() {
             return false;
         }
 
         //calculate the sum of r values to use in the initial seed of the random number generation
         let mut r_sum = Natural::from(0u32);
-        for r in aggregated_signature.r.iter() {
-            r_sum = (r_sum + r) % &self.p_nat;
+        for i in 0..aggregated_signature.get_count() {
+            let r_value = Natural::from_power_of_2_digits_asc(8, aggregated_signature.r_bytes[i].iter().cloned()).unwrap();
+            r_sum = (r_sum + r_value) % &self.p_nat;
         }
         let r_initrand_sum_bytes = &r_sum.to_power_of_2_digits_asc(8);
         let initial_random_seed = self.tagged_hash(b"aggregate", &r_initrand_sum_bytes, &r_initrand_sum_bytes, &message);
@@ -567,7 +584,8 @@ impl CryptoTrait for Crypto {
             y: Integer::from(0),
         };
         for i in 0..aggregated_signature.get_count() {
-            if &aggregated_signature.r[i] >= &self.p_nat || &aggregated_signature.s >= &self.n_nat {
+            let r_value = Natural::from_power_of_2_digits_asc(8, aggregated_signature.r_bytes[i].iter().cloned()).unwrap();
+            if &r_value >= &self.p_nat || &aggregated_signature.s >= &self.n_nat {
                 //r value in signature is not less than the elliptic curve field size or s value in signature is not less than the number of points on the elliptic curve
                 return false;
             }
@@ -579,7 +597,7 @@ impl CryptoTrait for Crypto {
                 % (&self.n_nat - &ONE_NAT)
                 + &ONE_NAT;
 
-            let r_point = if let Ok(r_point) = self.point_from_x(&aggregated_signature.r[i]) {
+            let r_point = if let Ok(r_point) = self.point_from_x(&r_value) {
                 r_point
             } else {
                 return false;
