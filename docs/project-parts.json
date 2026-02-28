@@ -1,0 +1,20 @@
+{
+  "repository_type": "monolith",
+  "parts": [
+    {
+      "part_id": "core",
+      "name": "moonblokz-crypto-lib",
+      "root_path": "/Users/slp/moonblokz/moonblokz-crypto-lib",
+      "project_type_id": "library",
+      "display_name": "Rust no_std crypto library",
+      "detected_technologies": [
+        "rust",
+        "cargo"
+      ],
+      "entry_points": [
+        "src/lib.rs"
+      ]
+    }
+  ],
+  "integration_points": []
+}

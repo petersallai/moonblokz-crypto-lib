@@ -12,6 +12,7 @@ Comprehensive details about MoonBlokz and the cryptographic algorithms used can 
 
 - `schnorr-malachite`: Schnorr signature implementation using the Malachite library.
 - `schnorr-num-bigint-dig`: Schnorr signature implementation using the Num BigInt Dig library.
+- `schnorr-crypto-bigint`: Schnorr signature implementation using the crypto-bigint library.
 - `bls-bls12_381-bls`: BLS signature implementation using the BLS12-381 library.
 
 **Note:** Only one crypto implementation feature can be enabled at a time.
@@ -26,6 +27,7 @@ Add the crate to your `Cargo.toml` and enable the desired feature:
 [dependencies]
 moonblokz-crypto = { version = "1.0", features = ["schnorr-malachite"], default-features=false }
 # moonblokz-crypto = { version = "1.0", features = ["schnorr-num-bigint-dig"],default-features=false  }
+# moonblokz-crypto = { version = "1.0", features = ["schnorr-crypto-bigint"],default-features=false  }
 # moonblokz-crypto = { version = "1.0", features = ["bls-bls12_381-bls"], default-features=false  }
 ```
 

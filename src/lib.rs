@@ -10,6 +10,7 @@
 //! # Features
 //! - `schnorr-malachite`: Use the Schnorr signature implementation from the Malachite library.
 //! - `schnorr-num-bigint-dig`: Use the Schnorr signature implementation from the Num BigInt Dig library.
+//! - `schnorr-crypto-bigint`: Use the Schnorr signature implementation from the crypto-bigint library.
 //! - `bls-bls12_381-bls`: Use the BLS signature implementation from the BLS12-381 library.
 //!
 //! # Usage
@@ -19,6 +20,7 @@
 //! [dependencies]
 //! moonblokz-crypto = { version = "0.1", features = ["schnorr-malachite"] }
 //! // moonblokz-crypto = { version = "0.1", features = ["schnorr-num-bigint-dig"] }
+//! // moonblokz-crypto = { version = "0.1", features = ["schnorr-crypto-bigint"] }
 //! // moonblokz-crypto = { version = "0.1", features = ["bls-bls12_381-bls"] }
 //!
 //! You can then use the library to create signers, sign messages, and verify signatures.
@@ -45,13 +47,14 @@
 //!
 
 #[cfg(any(
-    all(feature = "schnorr-malachite", any(feature = "schnorr-num-bigint-dig", feature = "bls-bls12_381-bls")),
-    all(feature = "schnorr-num-bigint-dig", any(feature = "schnorr-malachite", feature = "bls-bls12_381-bls")),
-    all(feature = "bls-bls12_381-bls", any(feature = "schnorr-malachite", feature = "schnorr-num-bigint-dig")),
+    all(feature = "schnorr-malachite", any(feature = "schnorr-num-bigint-dig", feature = "schnorr-crypto-bigint", feature = "bls-bls12_381-bls")),
+    all(feature = "schnorr-num-bigint-dig", any(feature = "schnorr-malachite", feature = "schnorr-crypto-bigint", feature = "bls-bls12_381-bls")),
+    all(feature = "schnorr-crypto-bigint", any(feature = "schnorr-malachite", feature = "schnorr-num-bigint-dig", feature = "bls-bls12_381-bls")),
+    all(feature = "bls-bls12_381-bls", any(feature = "schnorr-malachite", feature = "schnorr-num-bigint-dig", feature = "schnorr-crypto-bigint")),
 ))]
 compile_error!("Only one crypto implementation feature can be enabled at a time");
 
-#[cfg(not(any(feature = "schnorr-malachite", feature = "schnorr-num-bigint-dig", feature = "bls-bls12_381-bls")))]
+#[cfg(not(any(feature = "schnorr-malachite", feature = "schnorr-num-bigint-dig", feature = "schnorr-crypto-bigint", feature = "bls-bls12_381-bls")))]
 compile_error!("At least one crypto implementation feature must be enabled");
 
 #[cfg(feature = "schnorr")]
@@ -122,6 +125,19 @@ pub use schnorr_num_bigint_dig_signer::MultiSignature;
 pub use schnorr_num_bigint_dig_signer::PublicKey;
 #[cfg(feature = "schnorr-num-bigint-dig")]
 pub use schnorr_num_bigint_dig_signer::Signature;
+
+#[cfg(feature = "schnorr-crypto-bigint")]
+pub mod schnorr_crypto_bigint_signer;
+#[cfg(feature = "schnorr-crypto-bigint")]
+pub use schnorr_crypto_bigint_signer::AggregatedSignature;
+#[cfg(feature = "schnorr-crypto-bigint")]
+pub use schnorr_crypto_bigint_signer::Crypto;
+#[cfg(feature = "schnorr-crypto-bigint")]
+pub use schnorr_crypto_bigint_signer::MultiSignature;
+#[cfg(feature = "schnorr-crypto-bigint")]
+pub use schnorr_crypto_bigint_signer::PublicKey;
+#[cfg(feature = "schnorr-crypto-bigint")]
+pub use schnorr_crypto_bigint_signer::Signature;
 
 #[cfg(feature = "bls-bls12_381-bls")]
 pub mod bls_bls12_381_bls_signer;
@@ -711,5 +727,58 @@ mod tests {
 
         let public_keys: [&PublicKey; 0] = [];
         assert!(signer_1.verify_aggregated_signature(message, &aggregated_signature, &public_keys) == false);
+    }
+
+    #[cfg(feature = "schnorr-crypto-bigint")]
+    #[test]
+    fn test_crypto_bigint_regression_vectors() {
+        let private_key_1 = [1u8; PRIVATE_KEY_SIZE];
+        let private_key_2 = [2u8; PRIVATE_KEY_SIZE];
+        let message = b"Hello, world!";
+
+        let signer_1 = match Crypto::new(private_key_1) {
+            Ok(v) => v,
+            Err(_) => panic!("failed signer_1"),
+        };
+        let signer_2 = match Crypto::new(private_key_2) {
+            Ok(v) => v,
+            Err(_) => panic!("failed signer_2"),
+        };
+
+        let signature = signer_1.sign(message);
+        let expected_signature: [u8; 64] = [
+            0x85, 0x6c, 0xea, 0x9f, 0xc1, 0xaf, 0x2d, 0x26, 0x22, 0x06, 0x99, 0xeb, 0x49, 0x0f, 0xf2, 0x65, 0x51, 0xdf, 0x4d, 0x91,
+            0xd9, 0x24, 0xff, 0x47, 0xf0, 0x04, 0x8d, 0x62, 0x0b, 0x24, 0x7f, 0x3c, 0x0a, 0x48, 0xe8, 0x2e, 0x8f, 0xe3, 0x1c, 0xa5,
+            0x82, 0xfa, 0xa4, 0x33, 0xf9, 0x9d, 0xc8, 0xa4, 0x91, 0xbf, 0xeb, 0x74, 0x99, 0x11, 0x94, 0xe2, 0x41, 0x26, 0xde, 0x9b,
+            0x79, 0x1b, 0x46, 0x94,
+        ];
+        assert_eq!(signature.serialize(), &expected_signature);
+
+        let sig1 = signer_1.multi_sign(message);
+        let sig2 = signer_2.multi_sign(message);
+        let aggregated = match signer_1.aggregate_signatures(&[&sig1, &sig2], message) {
+            Ok(v) => v,
+            Err(_) => panic!("failed aggregate"),
+        };
+        let mut out = [0u8; MAX_AGGREGATED_SIGNATURE_BYTES];
+        let n = match aggregated.serialize(&mut out) {
+            Ok(v) => v,
+            Err(_) => panic!("failed serialize"),
+        };
+        let expected_count = 2usize;
+        let expected_r1: [u8; 32] = [
+            0x85, 0x6c, 0xea, 0x9f, 0xc1, 0xaf, 0x2d, 0x26, 0x22, 0x06, 0x99, 0xeb, 0x49, 0x0f, 0xf2, 0x65, 0x51, 0xdf, 0x4d, 0x91,
+            0xd9, 0x24, 0xff, 0x47, 0xf0, 0x04, 0x8d, 0x62, 0x0b, 0x24, 0x7f, 0x3c,
+        ];
+        let expected_r2: [u8; 32] = [
+            0xec, 0x23, 0xca, 0x57, 0xc7, 0x34, 0x47, 0x8e, 0xb8, 0xfe, 0x8b, 0xb8, 0x2d, 0xd9, 0xdf, 0x60, 0x14, 0xcf, 0xaf, 0x70,
+            0xd8, 0x6f, 0x51, 0x1e, 0x7d, 0x9f, 0xbf, 0x4d, 0xc4, 0x48, 0x9f, 0x05,
+        ];
+
+        assert_eq!(n, 98);
+        assert_eq!(u16::from_le_bytes([out[0], out[1]]) as usize, expected_count);
+        assert_ne!(&out[2..34], &[0u8; 32]); // aggregated scalar must be non-zero bytes
+        assert_eq!(&out[34..66], &expected_r1);
+        assert_eq!(&out[66..98], &expected_r2);
     }
 }

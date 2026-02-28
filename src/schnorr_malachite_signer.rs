@@ -6,7 +6,6 @@ use malachite_base::num::conversion::traits::SaturatingFrom;
 use malachite_base::num::conversion::traits::ToStringBase;
 use malachite_base::num::{arithmetic::traits::ModPow, conversion::traits::PowerOf2Digits};
 use malachite_nz::integer::Integer;
-use malachite_nz::integer::arithmetic::sign;
 use malachite_nz::natural::Natural;
 use sha2::digest::FixedOutput;
 use sha2::{Digest, Sha256};
