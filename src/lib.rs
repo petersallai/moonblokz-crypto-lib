@@ -1,48 +1,93 @@
 #![no_std]
 
-//! Moonblokz Crypto Library
+//! MoonBlokz Crypto Library
 //! <https://www.moonblokz.com>
-//! This library provides cryptographic functionalities for signing and verifying messages using different algorithms.
-//! It supports Schnorr signatures and BLS signatures, allowing for both single and multi-signature operations.
-//! Detailed information about MoonBlok are available in an article series, available at: <https://medium.com/@peter.sallai/moonblokz-series-part-i-building-a-hyper-local-blockchain-2f385b763c65>
-//! In the sixth part of the series, I discuss the cryptographic algorithms used in MoonBlokz.
+//!
+//! This crate provides the cryptographic subsystem used by MoonBlokz for message signing,
+//! verification, and compact multi-party approval evidence.
+//!
+//! It supports two algorithm families behind one compile-time-selected public API:
+//!
+//! - Schnorr
+//! - BLS
+//!
+//! The library is designed for the MoonBlokz operating environment:
+//!
+//! - constrained devices,
+//! - `no_std` compatibility,
+//! - low-bandwidth radio communication,
+//! - compact serialized artifacts,
+//! - and bounded aggregated-signature behavior.
+//!
+//! Detailed background is available in the MoonBlokz article series:
+//! <https://medium.com/@peter.sallai/moonblokz-series-part-i-building-a-hyper-local-blockchain-2f385b763c65>
+//! Part VI discusses the cryptographic design space used by MoonBlokz.
 //!
 //! # Features
-//! - `schnorr-malachite`: Use the Schnorr signature implementation from the Malachite library.
-//! - `schnorr-num-bigint-dig`: Use the Schnorr signature implementation from the Num BigInt Dig library.
-//! - `schnorr-crypto-bigint`: Use the Schnorr signature implementation from the crypto-bigint library.
-//! - `bls-bls12_381-bls`: Use the BLS signature implementation from the BLS12-381 library.
+//!
+//! Concrete backend features:
+//!
+//! - `schnorr-malachite`
+//! - `schnorr-num-bigint-dig`
+//! - `schnorr-crypto-bigint`
+//! - `bls-bls12_381-bls`
+//!
+//! Internal family features used by the crate:
+//!
+//! - `schnorr`
+//! - `bls`
+//!
+//! Exactly one concrete backend feature must be enabled at a time.
+//!
+//! # Signature Roles
+//!
+//! The public API distinguishes three artifact roles:
+//!
+//! - `Signature`: ordinary single-signer authorization artifact.
+//! - `MultiSignature`: aggregation-ready single-signer artifact intended for later combination.
+//! - `AggregatedSignature`: combined multi-party evidence artifact.
 //!
 //! # Usage
-//! To use this library, you need to enable one of the features in your `Cargo.toml` file.
-//! Possible features are:
+//!
+//! Enable exactly one backend feature in `Cargo.toml`:
+//!
 //! ```toml
 //! [dependencies]
-//! moonblokz-crypto = { version = "0.1", features = ["schnorr-malachite"] }
-//! // moonblokz-crypto = { version = "0.1", features = ["schnorr-num-bigint-dig"] }
-//! // moonblokz-crypto = { version = "0.1", features = ["schnorr-crypto-bigint"] }
-//! // moonblokz-crypto = { version = "0.1", features = ["bls-bls12_381-bls"] }
-//!
-//! You can then use the library to create signers, sign messages, and verify signatures.
+//! moonblokz-crypto = { version = "1.0", default-features = false, features = ["schnorr-malachite"] }
+//! # moonblokz-crypto = { version = "1.0", default-features = false, features = ["schnorr-num-bigint-dig"] }
+//! # moonblokz-crypto = { version = "1.0", default-features = false, features = ["schnorr-crypto-bigint"] }
+//! # moonblokz-crypto = { version = "1.0", default-features = false, features = ["bls-bls12_381-bls"] }
+//! ```
 //!
 //! # Example
+//!
 //! ```rust
 //! use moonblokz_crypto::{Crypto, CryptoTrait};
 //!
 //! fn main() {
 //!     let private_key = [1u8; 32];
-//!     let signer = Crypto::new(private_key).expect("Failed to create signer");
+//!     let signer = match Crypto::new(private_key) {
+//!         Ok(signer) => signer,
+//!         Err(_) => panic!("Failed to create signer"),
+//!     };
 //!     let message = b"Hello, world!";
 //!     let signature = signer.sign(message);
 //!     assert!(signer.verify_signature(message, &signature, signer.public_key()));
 //! }
-//! }
+//! ```
+//!
+//! For aggregation-ready signatures and aggregated verification, see the crate README.
 //!
 //! # License
+//!
 //! This library is licensed under the MIT License.
-//! See the [LICENSE](LICENSE) file for more details.
+//! See the [LICENSE](LICENSE) file for details.
+//!
+//! Enabled dependencies may use different licenses. Check dependency licensing before
+//! distributing binaries or selecting a backend.
 //!
 //! # Authors
+//!
 //! - Peter Sallai (Bad Access)
 //!
 
@@ -58,46 +103,46 @@ compile_error!("Only one crypto implementation feature can be enabled at a time"
 compile_error!("At least one crypto implementation feature must be enabled");
 
 #[cfg(feature = "schnorr")]
-///Single signature size (in bytes)
+/// Size of a `Signature` in bytes.
 pub const SIGNATURE_SIZE: usize = 64;
 #[cfg(feature = "schnorr")]
-///Multi signature size (in bytes)
+/// Size of a `MultiSignature` in bytes.
 pub const MULTI_SIGNATURE_SIZE: usize = 64;
 #[cfg(feature = "schnorr")]
-///Size of the public key (in bytes)
+/// Size of a `PublicKey` in bytes.
 pub const PUBLIC_KEY_SIZE: usize = 32;
 #[cfg(feature = "schnorr")]
-///Size of the private key (in bytes)
+/// Size of a private key in bytes.
 pub const PRIVATE_KEY_SIZE: usize = 32;
 #[cfg(feature = "schnorr")]
-///Contant parts's size in an aggregated signature (in bytes)
+/// Constant-size portion of an `AggregatedSignature` in bytes.
 pub const AGGREGATED_SIGNATURE_CONSTANT_SIZE: usize = 34;
 #[cfg(feature = "schnorr")]
-///Signature count dependent parts's size in an aggregated signature (in bytes)
+/// Per-signer variable-size portion of an `AggregatedSignature` in bytes.
 pub const AGGREGATED_SIGNATURE_VARIABLE_SIZE: usize = 32;
 
 #[cfg(feature = "bls")]
-///Single signature size (in bytes)
+/// Size of a `Signature` in bytes.
 pub const SIGNATURE_SIZE: usize = 48;
 #[cfg(feature = "bls")]
-///Multi signature size (in bytes)
+/// Size of a `MultiSignature` in bytes.
 pub const MULTI_SIGNATURE_SIZE: usize = 48;
 #[cfg(feature = "bls")]
-///Size of the public key (in bytes)
+/// Size of a `PublicKey` in bytes.
 pub const PUBLIC_KEY_SIZE: usize = 96;
 #[cfg(feature = "bls")]
-///Size of the private key (in bytes)
+/// Size of a private key in bytes.
 pub const PRIVATE_KEY_SIZE: usize = 32;
 #[cfg(feature = "bls")]
-///Contant parts's size in an aggregated signature (in bytes)
+/// Constant-size portion of an `AggregatedSignature` in bytes.
 pub const AGGREGATED_SIGNATURE_CONSTANT_SIZE: usize = 50;
 #[cfg(feature = "bls")]
-///Signature count dependent parts's size in an aggregated signature (in bytes)
+/// Per-signer variable-size portion of an `AggregatedSignature` in bytes.
 pub const AGGREGATED_SIGNATURE_VARIABLE_SIZE: usize = 0;
 
-///Maximum number of signatures supported in an aggregated signature (no heap allocation).
+/// Maximum number of signer contributions supported in an `AggregatedSignature`.
 pub const MAX_AGGREGATED_SIGNATURES: usize = 50;
-///Maximum serialized size of an aggregated signature (in bytes).
+/// Maximum serialized size of an `AggregatedSignature` in bytes.
 pub const MAX_AGGREGATED_SIGNATURE_BYTES: usize = AGGREGATED_SIGNATURE_CONSTANT_SIZE + AGGREGATED_SIGNATURE_VARIABLE_SIZE * MAX_AGGREGATED_SIGNATURES;
 
 #[cfg(feature = "schnorr-malachite")]
@@ -162,65 +207,63 @@ pub enum CryptoError {
     InvalidSignature,
 }
 
-/// A trait representing a cryptographic signature.
-/// Provides methods to create a signature from bytes and serialize it back to bytes.
+/// A trait representing a `Signature`.
+///
+/// A `Signature` is the ordinary single-signer authorization artifact in the public API.
 pub trait SignatureTrait: Sized {
-    /// Creates a new signature from a byte slice.
+    /// Creates a `Signature` from serialized bytes.
     ///
     /// # Arguments
-    /// * `bytes` - A slice of bytes representing the signature.
+    /// * `bytes` - A slice of bytes representing the serialized signature.
     ///
     /// # Returns
     /// * `Ok(Self)` if the signature is valid.
     /// * `Err(CryptoError::InvalidSignature)` if the signature is invalid.
     fn new(bytes: &[u8]) -> Result<Self, CryptoError>;
 
-    /// Serializes the signature into a fixed-size byte array.
-    ///
-    /// # Returns
-    /// A `[u8; SIGNATURE_SIZE]` array containing the serialized signature.
+    /// Serializes the `Signature` into its fixed-size byte representation.
     fn serialize(&self) -> &[u8; SIGNATURE_SIZE];
 }
 
-/// A trait representing a single multi-signature (can be aggregated)
-/// Provides methods to create, serialize multi-signatures.
+/// A trait representing a `MultiSignature`.
+///
+/// In the public API, `MultiSignature` is the aggregation-ready single-signer artifact.
 pub trait MultiSignatureTrait: Sized {
-    /// Creates a new aggregated signature from a byte slice. Only multi-signature can be aggregated into an aggregated signature.
+    /// Creates a `MultiSignature` from serialized bytes.
     ///
     /// # Arguments
-    /// * `bytes` - A slice of bytes representing the aggregated signature.
+    /// * `bytes` - A slice of bytes representing the serialized aggregation-ready signature.
     ///
     /// # Returns
-    /// * `Ok(Self)` if the aggregated signature is valid.
-    /// * `Err(CryptoError::InvalidSignature)` if the aggregated signature is invalid.
+    /// * `Ok(Self)` if the `MultiSignature` is valid.
+    /// * `Err(CryptoError::InvalidSignature)` if the `MultiSignature` is invalid.
     fn new(bytes: &[u8]) -> Result<Self, CryptoError>;
 
-    /// Serializes the multi-signature into a fixed-size byte array.
-    ///
-    /// # Returns
-    /// A `[u8; MULTI_SIGNATURE_SIZE]` array containing the serialized multi-signature.
+    /// Serializes the `MultiSignature` into its fixed-size byte representation.
     fn serialize(&self) -> &[u8; MULTI_SIGNATURE_SIZE];
 }
 
-/// A trait representing an aggregated cryptographic signature.
-/// Provides methods to create, serialize, and retrieve the count of aggregated signatures.
+/// A trait representing an `AggregatedSignature`.
+///
+/// An `AggregatedSignature` is the combined multi-party evidence artifact in the public API.
 pub trait AggregatedSignatureTrait: Sized {
-    /// Creates a new aggregated signature from a byte slice.
+    /// Creates an `AggregatedSignature` from serialized bytes.
     ///
     /// # Arguments
-    /// * `bytes` - A slice of bytes representing the aggregated signature.
+    /// * `bytes` - A slice of bytes representing the serialized aggregated signature.
     ///
     /// # Returns
     /// * `Ok(Self)` if the aggregated signature is valid.
     /// * `Err(CryptoError::InvalidSignature)` if the aggregated signature is invalid.
     fn new(bytes: &[u8]) -> Result<Self, CryptoError>;
 
-    /// Serializes the aggregated signature into the provided output buffer.
+    /// Serializes the `AggregatedSignature` into the provided output buffer.
     ///
     /// # Returns
     /// The number of bytes written to `out`.
     fn serialize(&self, out: &mut [u8]) -> Result<usize, CryptoError>;
 
+    /// Returns the number of signer contributions encoded in this aggregated signature.
     fn get_count(&self) -> usize;
     /// Returns the serialized length of this aggregated signature.
     fn serialized_len(&self) -> usize;
@@ -246,8 +289,8 @@ pub trait PublicKeyTrait: Sized {
     fn serialize(&self) -> &[u8; PUBLIC_KEY_SIZE];
 }
 
-/// A trait representing a cryptographic signer.
-/// Provides methods for key management, signing, and verifying messages.
+/// A trait representing the main cryptographic interface.
+/// Provides methods for key management, signing, verification, and aggregation.
 pub trait CryptoTrait: Sized {
     /// Creates a new signer instance from a private key.
     ///
@@ -259,74 +302,26 @@ pub trait CryptoTrait: Sized {
     /// * `Err(CryptoError::InvalidPrivateKey)` if the private key is invalid.
     fn new(private_key_bytes: [u8; PRIVATE_KEY_SIZE]) -> Result<Self, CryptoError>;
 
-    /// Retrieves the public key associated with the signer.
-    ///
-    /// # Returns
-    /// A reference to the `PublicKey`.
+    /// Retrieves the public key associated with this signer.
     fn public_key(&self) -> &PublicKey;
 
-    /// Signs a message using the private key.
-    ///
-    /// # Arguments
-    /// * `message` - A slice of bytes representing the message to be signed.
-    ///
-    /// # Returns
-    /// A `Signature` object containing the generated signature.
+    /// Creates a `Signature` for a message.
     fn sign(&self, message: &[u8]) -> Signature;
 
-    /// Creates a multi-signature for a message using the private key.
+    /// Creates a `MultiSignature` for a message.
     ///
-    /// # Arguments
-    /// * `message` - A slice of bytes representing the message to be signed.
-    ///
-    /// # Returns
-    /// A `MultiSignature` object containing the generated multi-signature.
+    /// `MultiSignature` is the aggregation-ready single-signer artifact in the public API.
     fn multi_sign(&self, message: &[u8]) -> MultiSignature;
 
-    /// Verifies a multi-signature against a message and a public key.
-    ///
-    /// # Arguments
-    /// * `message` - A slice of bytes representing the message.
-    /// * `multi_signature` - A reference to the `MultiSignature` to be verified.
-    /// * `public_key` - A reference to the `PublicKey` to verify against.
-    /// # Returns
-    /// * `true` if the multi-signature is valid.
-    /// * `false` otherwise.
-    ///
+    /// Verifies a `MultiSignature` against a message and a public key.
     fn verify_multi_signature(&self, message: &[u8], multi_signature: &MultiSignature, public_key: &PublicKey) -> bool;
-    /// Verifies a signature against a message and a public key.
-    ///
-    /// # Arguments
-    /// * `message` - A slice of bytes representing the message.
-    /// * `signature` - A reference to the `Signature` to be verified.
-    /// * `public_key` - A reference to the `PublicKey` to verify against.
-    ///
-    /// # Returns
-    /// * `true` if the signature is valid.
-    /// * `false` otherwise.
+    /// Verifies a `Signature` against a message and a public key.
     fn verify_signature(&self, message: &[u8], signature: &Signature, public_key: &PublicKey) -> bool;
 
-    /// Aggregates multiple individual multi-signatures into a single aggregated signature.
-    ///
-    /// # Arguments
-    /// * `signatures` - A slice of references to `MultiSignature` objects to be aggregated.
-    /// * `message` - A slice of bytes representing the message that was signed.
-    ///
-    /// # Returns
-    /// * `Ok(AggregatedSignature)` if aggregation is successful.
-    /// * `Err(CryptoError)` if aggregation fails.
+    /// Aggregates multiple aggregation-ready signatures into one `AggregatedSignature`.
     fn aggregate_signatures(&self, signatures: &[&MultiSignature], message: &[u8]) -> Result<AggregatedSignature, CryptoError>;
 
-    /// Verifies an aggregated signature against a message and a set of public keys.
-    ///
-    /// # Arguments
-    /// * `message` - A slice of bytes representing the message.
-    /// * `aggregated_signature` - A reference to the `AggregatedSignature` to be verified.
-    /// * `public_keys` - A slice of references to `PublicKey` objects to verify against.
-    ///
-    /// # Returns
-    /// * `true` if the aggregated signature is valid.
-    /// * `false` otherwise.
+    /// Verifies an `AggregatedSignature` against a message and a set of public keys.
     fn verify_aggregated_signature(&self, message: &[u8], aggregated_signature: &AggregatedSignature, public_keys: &[&PublicKey]) -> bool;
 }
 
