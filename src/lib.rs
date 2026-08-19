@@ -92,14 +92,47 @@
 //!
 
 #[cfg(any(
-    all(feature = "schnorr-malachite", any(feature = "schnorr-num-bigint-dig", feature = "schnorr-crypto-bigint", feature = "bls-bls12_381-bls")),
-    all(feature = "schnorr-num-bigint-dig", any(feature = "schnorr-malachite", feature = "schnorr-crypto-bigint", feature = "bls-bls12_381-bls")),
-    all(feature = "schnorr-crypto-bigint", any(feature = "schnorr-malachite", feature = "schnorr-num-bigint-dig", feature = "bls-bls12_381-bls")),
-    all(feature = "bls-bls12_381-bls", any(feature = "schnorr-malachite", feature = "schnorr-num-bigint-dig", feature = "schnorr-crypto-bigint")),
+    all(
+        feature = "schnorr-malachite",
+        any(
+            feature = "schnorr-num-bigint-dig",
+            feature = "schnorr-crypto-bigint",
+            feature = "bls-bls12_381-bls"
+        )
+    ),
+    all(
+        feature = "schnorr-num-bigint-dig",
+        any(
+            feature = "schnorr-malachite",
+            feature = "schnorr-crypto-bigint",
+            feature = "bls-bls12_381-bls"
+        )
+    ),
+    all(
+        feature = "schnorr-crypto-bigint",
+        any(
+            feature = "schnorr-malachite",
+            feature = "schnorr-num-bigint-dig",
+            feature = "bls-bls12_381-bls"
+        )
+    ),
+    all(
+        feature = "bls-bls12_381-bls",
+        any(
+            feature = "schnorr-malachite",
+            feature = "schnorr-num-bigint-dig",
+            feature = "schnorr-crypto-bigint"
+        )
+    ),
 ))]
 compile_error!("Only one crypto implementation feature can be enabled at a time");
 
-#[cfg(not(any(feature = "schnorr-malachite", feature = "schnorr-num-bigint-dig", feature = "schnorr-crypto-bigint", feature = "bls-bls12_381-bls")))]
+#[cfg(not(any(
+    feature = "schnorr-malachite",
+    feature = "schnorr-num-bigint-dig",
+    feature = "schnorr-crypto-bigint",
+    feature = "bls-bls12_381-bls"
+)))]
 compile_error!("At least one crypto implementation feature must be enabled");
 
 #[cfg(feature = "schnorr")]
@@ -143,7 +176,8 @@ pub const AGGREGATED_SIGNATURE_VARIABLE_SIZE: usize = 0;
 /// Maximum number of signer contributions supported in an `AggregatedSignature`.
 pub const MAX_AGGREGATED_SIGNATURES: usize = 50;
 /// Maximum serialized size of an `AggregatedSignature` in bytes.
-pub const MAX_AGGREGATED_SIGNATURE_BYTES: usize = AGGREGATED_SIGNATURE_CONSTANT_SIZE + AGGREGATED_SIGNATURE_VARIABLE_SIZE * MAX_AGGREGATED_SIGNATURES;
+pub const MAX_AGGREGATED_SIGNATURE_BYTES: usize = AGGREGATED_SIGNATURE_CONSTANT_SIZE
+    + AGGREGATED_SIGNATURE_VARIABLE_SIZE * MAX_AGGREGATED_SIGNATURES;
 
 #[cfg(feature = "schnorr-malachite")]
 pub mod schnorr_malachite_signer;
@@ -314,15 +348,34 @@ pub trait CryptoTrait: Sized {
     fn multi_sign(&self, message: &[u8]) -> MultiSignature;
 
     /// Verifies a `MultiSignature` against a message and a public key.
-    fn verify_multi_signature(&self, message: &[u8], multi_signature: &MultiSignature, public_key: &PublicKey) -> bool;
+    fn verify_multi_signature(
+        &self,
+        message: &[u8],
+        multi_signature: &MultiSignature,
+        public_key: &PublicKey,
+    ) -> bool;
     /// Verifies a `Signature` against a message and a public key.
-    fn verify_signature(&self, message: &[u8], signature: &Signature, public_key: &PublicKey) -> bool;
+    fn verify_signature(
+        &self,
+        message: &[u8],
+        signature: &Signature,
+        public_key: &PublicKey,
+    ) -> bool;
 
     /// Aggregates multiple aggregation-ready signatures into one `AggregatedSignature`.
-    fn aggregate_signatures(&self, signatures: &[&MultiSignature], message: &[u8]) -> Result<AggregatedSignature, CryptoError>;
+    fn aggregate_signatures(
+        &self,
+        signatures: &[&MultiSignature],
+        message: &[u8],
+    ) -> Result<AggregatedSignature, CryptoError>;
 
     /// Verifies an `AggregatedSignature` against a message and a set of public keys.
-    fn verify_aggregated_signature(&self, message: &[u8], aggregated_signature: &AggregatedSignature, public_keys: &[&PublicKey]) -> bool;
+    fn verify_aggregated_signature(
+        &self,
+        message: &[u8],
+        aggregated_signature: &AggregatedSignature,
+        public_keys: &[&PublicKey],
+    ) -> bool;
 }
 
 #[cfg(test)]
@@ -447,7 +500,10 @@ mod tests {
         };
 
         let public_keys = [public_key_1, public_key_2];
-        assert!(signer_1.verify_aggregated_signature(message2, &aggregated_signature, &public_keys) == false);
+        assert!(
+            signer_1.verify_aggregated_signature(message2, &aggregated_signature, &public_keys)
+                == false
+        );
     }
 
     #[test]
@@ -488,7 +544,10 @@ mod tests {
         };
 
         let public_keys = [public_key_1, public_key_3];
-        assert!(signer_1.verify_aggregated_signature(message, &aggregated_signature, &public_keys) == false);
+        assert!(
+            signer_1.verify_aggregated_signature(message, &aggregated_signature, &public_keys)
+                == false
+        );
     }
 
     #[test]
@@ -554,7 +613,11 @@ mod tests {
             Ok(sig) => sig,
             Err(_) => panic!("Failed to deserialize multi-signature"),
         };
-        assert!(signer.verify_multi_signature(message, &deserialized_multi_signature, signer.public_key()));
+        assert!(signer.verify_multi_signature(
+            message,
+            &deserialized_multi_signature,
+            signer.public_key()
+        ));
     }
 
     #[test]
@@ -580,17 +643,23 @@ mod tests {
             Err(_) => panic!("Failed to aggregate signature"),
         };
         let mut serialized_aggregated_signature = [0u8; MAX_AGGREGATED_SIGNATURE_BYTES];
-        let serialized_len = match aggregated_signature.serialize(&mut serialized_aggregated_signature) {
-            Ok(len) => len,
-            Err(_) => panic!("Failed to serialize aggregated signature"),
-        };
-        let deserialized_aggregated_signature_result = AggregatedSignature::new(&serialized_aggregated_signature[..serialized_len]);
+        let serialized_len =
+            match aggregated_signature.serialize(&mut serialized_aggregated_signature) {
+                Ok(len) => len,
+                Err(_) => panic!("Failed to serialize aggregated signature"),
+            };
+        let deserialized_aggregated_signature_result =
+            AggregatedSignature::new(&serialized_aggregated_signature[..serialized_len]);
         let deserialized_aggregated_signature = match deserialized_aggregated_signature_result {
             Ok(sig) => sig,
             Err(_) => panic!("Failed to deserialize aggregated signature"),
         };
         let public_keys = [signer.public_key()];
-        assert!(signer.verify_aggregated_signature(message, &deserialized_aggregated_signature, &public_keys));
+        assert!(signer.verify_aggregated_signature(
+            message,
+            &deserialized_aggregated_signature,
+            &public_keys
+        ));
     }
 
     #[test]
@@ -721,7 +790,10 @@ mod tests {
         };
 
         let public_keys: [&PublicKey; 0] = [];
-        assert!(signer_1.verify_aggregated_signature(message, &aggregated_signature, &public_keys) == false);
+        assert!(
+            signer_1.verify_aggregated_signature(message, &aggregated_signature, &public_keys)
+                == false
+        );
     }
 
     #[cfg(feature = "schnorr-crypto-bigint")]
@@ -742,10 +814,11 @@ mod tests {
 
         let signature = signer_1.sign(message);
         let expected_signature: [u8; 64] = [
-            0x85, 0x6c, 0xea, 0x9f, 0xc1, 0xaf, 0x2d, 0x26, 0x22, 0x06, 0x99, 0xeb, 0x49, 0x0f, 0xf2, 0x65, 0x51, 0xdf, 0x4d, 0x91,
-            0xd9, 0x24, 0xff, 0x47, 0xf0, 0x04, 0x8d, 0x62, 0x0b, 0x24, 0x7f, 0x3c, 0x0a, 0x48, 0xe8, 0x2e, 0x8f, 0xe3, 0x1c, 0xa5,
-            0x82, 0xfa, 0xa4, 0x33, 0xf9, 0x9d, 0xc8, 0xa4, 0x91, 0xbf, 0xeb, 0x74, 0x99, 0x11, 0x94, 0xe2, 0x41, 0x26, 0xde, 0x9b,
-            0x79, 0x1b, 0x46, 0x94,
+            0x85, 0x6c, 0xea, 0x9f, 0xc1, 0xaf, 0x2d, 0x26, 0x22, 0x06, 0x99, 0xeb, 0x49, 0x0f,
+            0xf2, 0x65, 0x51, 0xdf, 0x4d, 0x91, 0xd9, 0x24, 0xff, 0x47, 0xf0, 0x04, 0x8d, 0x62,
+            0x0b, 0x24, 0x7f, 0x3c, 0x0a, 0x48, 0xe8, 0x2e, 0x8f, 0xe3, 0x1c, 0xa5, 0x82, 0xfa,
+            0xa4, 0x33, 0xf9, 0x9d, 0xc8, 0xa4, 0x91, 0xbf, 0xeb, 0x74, 0x99, 0x11, 0x94, 0xe2,
+            0x41, 0x26, 0xde, 0x9b, 0x79, 0x1b, 0x46, 0x94,
         ];
         assert_eq!(signature.serialize(), &expected_signature);
 
@@ -762,16 +835,21 @@ mod tests {
         };
         let expected_count = 2usize;
         let expected_r1: [u8; 32] = [
-            0x85, 0x6c, 0xea, 0x9f, 0xc1, 0xaf, 0x2d, 0x26, 0x22, 0x06, 0x99, 0xeb, 0x49, 0x0f, 0xf2, 0x65, 0x51, 0xdf, 0x4d, 0x91,
-            0xd9, 0x24, 0xff, 0x47, 0xf0, 0x04, 0x8d, 0x62, 0x0b, 0x24, 0x7f, 0x3c,
+            0x85, 0x6c, 0xea, 0x9f, 0xc1, 0xaf, 0x2d, 0x26, 0x22, 0x06, 0x99, 0xeb, 0x49, 0x0f,
+            0xf2, 0x65, 0x51, 0xdf, 0x4d, 0x91, 0xd9, 0x24, 0xff, 0x47, 0xf0, 0x04, 0x8d, 0x62,
+            0x0b, 0x24, 0x7f, 0x3c,
         ];
         let expected_r2: [u8; 32] = [
-            0xec, 0x23, 0xca, 0x57, 0xc7, 0x34, 0x47, 0x8e, 0xb8, 0xfe, 0x8b, 0xb8, 0x2d, 0xd9, 0xdf, 0x60, 0x14, 0xcf, 0xaf, 0x70,
-            0xd8, 0x6f, 0x51, 0x1e, 0x7d, 0x9f, 0xbf, 0x4d, 0xc4, 0x48, 0x9f, 0x05,
+            0xec, 0x23, 0xca, 0x57, 0xc7, 0x34, 0x47, 0x8e, 0xb8, 0xfe, 0x8b, 0xb8, 0x2d, 0xd9,
+            0xdf, 0x60, 0x14, 0xcf, 0xaf, 0x70, 0xd8, 0x6f, 0x51, 0x1e, 0x7d, 0x9f, 0xbf, 0x4d,
+            0xc4, 0x48, 0x9f, 0x05,
         ];
 
         assert_eq!(n, 98);
-        assert_eq!(u16::from_le_bytes([out[0], out[1]]) as usize, expected_count);
+        assert_eq!(
+            u16::from_le_bytes([out[0], out[1]]) as usize,
+            expected_count
+        );
         assert_ne!(&out[2..34], &[0u8; 32]); // aggregated scalar must be non-zero bytes
         assert_eq!(&out[34..66], &expected_r1);
         assert_eq!(&out[66..98], &expected_r2);

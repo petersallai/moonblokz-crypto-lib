@@ -1,16 +1,19 @@
+use bls12_381_bls::{
+    MultisigPublicKey, MultisigSignature as BLS_MultiSignature, PublicKey as BLS_PublicKey,
+    SecretKey, Signature as BLS_Signature,
+};
 use core::mem::MaybeUninit;
-use bls12_381_bls::{MultisigPublicKey, MultisigSignature as BLS_MultiSignature, PublicKey as BLS_PublicKey, SecretKey, Signature as BLS_Signature};
 use dusk_bytes::Serializable;
 
 use crate::AGGREGATED_SIGNATURE_CONSTANT_SIZE;
 use crate::AggregatedSignatureTrait;
+use crate::MAX_AGGREGATED_SIGNATURES;
 use crate::MULTI_SIGNATURE_SIZE;
 use crate::MultiSignatureTrait;
 use crate::PRIVATE_KEY_SIZE;
 use crate::PUBLIC_KEY_SIZE;
 use crate::PublicKeyTrait;
 use crate::SIGNATURE_SIZE;
-use crate::MAX_AGGREGATED_SIGNATURES;
 
 use crate::CryptoError;
 use crate::CryptoTrait;
@@ -27,8 +30,11 @@ impl PublicKeyTrait for PublicKey {
             return Err(CryptoError::InvalidPublicKey);
         }
 
-        let public_key_bytes: [u8; PUBLIC_KEY_SIZE] = bytes[0..PUBLIC_KEY_SIZE].try_into().map_err(|_| CryptoError::InvalidPublicKey)?;
-        let bls_public_key = BLS_PublicKey::from_bytes(&public_key_bytes).map_err(|_| CryptoError::InvalidPublicKey)?;
+        let public_key_bytes: [u8; PUBLIC_KEY_SIZE] = bytes[0..PUBLIC_KEY_SIZE]
+            .try_into()
+            .map_err(|_| CryptoError::InvalidPublicKey)?;
+        let bls_public_key = BLS_PublicKey::from_bytes(&public_key_bytes)
+            .map_err(|_| CryptoError::InvalidPublicKey)?;
         Ok(PublicKey {
             bls_public_key,
             bytes: public_key_bytes,
@@ -51,8 +57,11 @@ impl SignatureTrait for Signature {
             return Err(CryptoError::InvalidSignature);
         }
 
-        let signature_bytes: [u8; SIGNATURE_SIZE] = bytes[0..SIGNATURE_SIZE].try_into().map_err(|_| CryptoError::InvalidSignature)?;
-        let bls_signature = BLS_Signature::from_bytes(&signature_bytes).map_err(|_| CryptoError::InvalidSignature)?;
+        let signature_bytes: [u8; SIGNATURE_SIZE] = bytes[0..SIGNATURE_SIZE]
+            .try_into()
+            .map_err(|_| CryptoError::InvalidSignature)?;
+        let bls_signature = BLS_Signature::from_bytes(&signature_bytes)
+            .map_err(|_| CryptoError::InvalidSignature)?;
         Ok(Signature {
             bls_signature,
             bytes: signature_bytes,
@@ -75,8 +84,11 @@ impl MultiSignatureTrait for MultiSignature {
             return Err(CryptoError::InvalidSignature);
         }
 
-        let signature_bytes: [u8; SIGNATURE_SIZE] = bytes[0..SIGNATURE_SIZE].try_into().map_err(|_| CryptoError::InvalidSignature)?;
-        let bls_multi_signature = BLS_MultiSignature::from_bytes(&signature_bytes).map_err(|_| CryptoError::InvalidSignature)?;
+        let signature_bytes: [u8; SIGNATURE_SIZE] = bytes[0..SIGNATURE_SIZE]
+            .try_into()
+            .map_err(|_| CryptoError::InvalidSignature)?;
+        let bls_multi_signature = BLS_MultiSignature::from_bytes(&signature_bytes)
+            .map_err(|_| CryptoError::InvalidSignature)?;
         Ok(MultiSignature {
             bls_multi_signature,
             bytes: signature_bytes,
@@ -100,12 +112,17 @@ impl AggregatedSignatureTrait for AggregatedSignature {
             return Err(CryptoError::InvalidSignature);
         }
 
-        let count_slice: [u8; 2] = bytes[0..2].try_into().map_err(|_| CryptoError::InvalidSignature)?;
+        let count_slice: [u8; 2] = bytes[0..2]
+            .try_into()
+            .map_err(|_| CryptoError::InvalidSignature)?;
         let count = u16::from_le_bytes(count_slice);
 
-        let signature_bytes: [u8; SIGNATURE_SIZE] = bytes[2..50].try_into().map_err(|_| CryptoError::InvalidSignature)?;
+        let signature_bytes: [u8; SIGNATURE_SIZE] = bytes[2..50]
+            .try_into()
+            .map_err(|_| CryptoError::InvalidSignature)?;
 
-        let bls_aggregated_signature = BLS_MultiSignature::from_bytes(&signature_bytes).map_err(|_| CryptoError::InvalidSignature)?;
+        let bls_aggregated_signature = BLS_MultiSignature::from_bytes(&signature_bytes)
+            .map_err(|_| CryptoError::InvalidSignature)?;
         Ok(AggregatedSignature {
             bls_aggregated_signature: bls_aggregated_signature,
             count: count as usize,
@@ -139,7 +156,8 @@ pub struct Crypto {
 
 impl CryptoTrait for Crypto {
     fn new(private_key_bytes: [u8; PRIVATE_KEY_SIZE]) -> Result<Self, CryptoError> {
-        let secret_key = SecretKey::from_bytes(&private_key_bytes).map_err(|_| CryptoError::InvalidPrivateKey)?;
+        let secret_key = SecretKey::from_bytes(&private_key_bytes)
+            .map_err(|_| CryptoError::InvalidPrivateKey)?;
         let bls_public_key = BLS_PublicKey::from(&secret_key);
         let public_key = PublicKey {
             bls_public_key,
@@ -166,37 +184,59 @@ impl CryptoTrait for Crypto {
     }
 
     fn multi_sign(&self, message: &[u8]) -> MultiSignature {
-        let bls_multi_signature = self.private_key.sign_multisig(&self.public_key.bls_public_key, message);
+        let bls_multi_signature = self
+            .private_key
+            .sign_multisig(&self.public_key.bls_public_key, message);
         MultiSignature {
             bls_multi_signature,
             bytes: bls_multi_signature.to_bytes(),
         }
     }
 
-    fn verify_signature(&self, message: &[u8], signature: &Signature, public_key: &PublicKey) -> bool {
-        public_key.bls_public_key.verify(&signature.bls_signature, message).is_ok()
+    fn verify_signature(
+        &self,
+        message: &[u8],
+        signature: &Signature,
+        public_key: &PublicKey,
+    ) -> bool {
+        public_key
+            .bls_public_key
+            .verify(&signature.bls_signature, message)
+            .is_ok()
     }
 
-    fn verify_multi_signature(&self, message: &[u8], multi_signature: &MultiSignature, public_key: &PublicKey) -> bool {
+    fn verify_multi_signature(
+        &self,
+        message: &[u8],
+        multi_signature: &MultiSignature,
+        public_key: &PublicKey,
+    ) -> bool {
         let bls_public_keys = [public_key.bls_public_key.clone()];
 
-        let bls_aggregated_public_key = if let Ok(bls_aggregated_public_key) = MultisigPublicKey::aggregate(&bls_public_keys) {
-            bls_aggregated_public_key
-        } else {
-            return false;
-        };
-        bls_aggregated_public_key.verify(&multi_signature.bls_multi_signature, message).is_ok()
+        let bls_aggregated_public_key =
+            if let Ok(bls_aggregated_public_key) = MultisigPublicKey::aggregate(&bls_public_keys) {
+                bls_aggregated_public_key
+            } else {
+                return false;
+            };
+        bls_aggregated_public_key
+            .verify(&multi_signature.bls_multi_signature, message)
+            .is_ok()
     }
 
-    fn aggregate_signatures(&self, signatures: &[&MultiSignature], _message: &[u8]) -> Result<AggregatedSignature, CryptoError> {
+    fn aggregate_signatures(
+        &self,
+        signatures: &[&MultiSignature],
+        _message: &[u8],
+    ) -> Result<AggregatedSignature, CryptoError> {
         if signatures.is_empty() || signatures.len() > MAX_AGGREGATED_SIGNATURES {
             return Err(CryptoError::InvalidSignature);
         }
 
         let first_signature = signatures[0].bls_multi_signature.clone();
         let aggregated_bls_signature = if signatures.len() > 1 {
-            let mut bls_multi_signatures: [MaybeUninit<BLS_MultiSignature>; MAX_AGGREGATED_SIGNATURES] =
-                unsafe { MaybeUninit::uninit().assume_init() };
+            let mut bls_multi_signatures: [MaybeUninit<BLS_MultiSignature>;
+                MAX_AGGREGATED_SIGNATURES] = unsafe { MaybeUninit::uninit().assume_init() };
             for (index, signature) in signatures.iter().enumerate().skip(1) {
                 bls_multi_signatures[index - 1].write(signature.bls_multi_signature.clone());
             }
@@ -219,8 +259,15 @@ impl CryptoTrait for Crypto {
         })
     }
 
-    fn verify_aggregated_signature(&self, message: &[u8], aggregated_signature: &AggregatedSignature, public_keys: &[&PublicKey]) -> bool {
-        if aggregated_signature.get_count() != public_keys.len() || public_keys.len() > MAX_AGGREGATED_SIGNATURES {
+    fn verify_aggregated_signature(
+        &self,
+        message: &[u8],
+        aggregated_signature: &AggregatedSignature,
+        public_keys: &[&PublicKey],
+    ) -> bool {
+        if aggregated_signature.get_count() != public_keys.len()
+            || public_keys.len() > MAX_AGGREGATED_SIGNATURES
+        {
             return false;
         }
 
@@ -232,11 +279,12 @@ impl CryptoTrait for Crypto {
         let keys_ptr = bls_public_keys.as_ptr() as *const BLS_PublicKey;
         let bls_public_keys = unsafe { core::slice::from_raw_parts(keys_ptr, public_keys.len()) };
 
-        let bls_aggregated_public_key = if let Ok(bls_aggregated_public_key) = MultisigPublicKey::aggregate(&bls_public_keys) {
-            bls_aggregated_public_key
-        } else {
-            return false;
-        };
+        let bls_aggregated_public_key =
+            if let Ok(bls_aggregated_public_key) = MultisigPublicKey::aggregate(&bls_public_keys) {
+                bls_aggregated_public_key
+            } else {
+                return false;
+            };
         bls_aggregated_public_key
             .verify(&aggregated_signature.bls_aggregated_signature, message)
             .is_ok()

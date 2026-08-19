@@ -6,13 +6,13 @@ use sha2::{Digest, Sha256};
 use crate::AGGREGATED_SIGNATURE_CONSTANT_SIZE;
 use crate::AGGREGATED_SIGNATURE_VARIABLE_SIZE;
 use crate::AggregatedSignatureTrait;
+use crate::MAX_AGGREGATED_SIGNATURES;
 use crate::MULTI_SIGNATURE_SIZE;
 use crate::MultiSignatureTrait;
 use crate::PRIVATE_KEY_SIZE;
 use crate::PUBLIC_KEY_SIZE;
 use crate::PublicKeyTrait;
 use crate::SIGNATURE_SIZE;
-use crate::MAX_AGGREGATED_SIGNATURES;
 
 use crate::CryptoError;
 use crate::CryptoTrait;
@@ -37,9 +37,14 @@ impl PublicKeyTrait for PublicKey {
             return Err(CryptoError::InvalidPublicKey);
         }
 
-        let public_key_bytes: [u8; 32] = bytes[0..32].try_into().map_err(|_| CryptoError::InvalidPublicKey)?;
+        let public_key_bytes: [u8; 32] = bytes[0..32]
+            .try_into()
+            .map_err(|_| CryptoError::InvalidPublicKey)?;
         let point = Self::calculate_public_key_point(&public_key_bytes)?;
-        Ok(PublicKey { point, bytes: public_key_bytes })
+        Ok(PublicKey {
+            point,
+            bytes: public_key_bytes,
+        })
     }
 
     fn serialize(&self) -> &[u8; crate::PUBLIC_KEY_SIZE] {
@@ -89,11 +94,17 @@ impl SignatureTrait for Signature {
             return Err(CryptoError::InvalidSignature);
         }
 
-        let signature_bytes: [u8; 64] = bytes[0..64].try_into().map_err(|_| CryptoError::InvalidSignature)?;
+        let signature_bytes: [u8; 64] = bytes[0..64]
+            .try_into()
+            .map_err(|_| CryptoError::InvalidSignature)?;
         let r = U256::from_le_slice(&signature_bytes[0..32]);
         let s = U256::from_le_slice(&signature_bytes[32..64]);
 
-        Ok(Signature { r, s, bytes: signature_bytes })
+        Ok(Signature {
+            r,
+            s,
+            bytes: signature_bytes,
+        })
     }
 
     fn serialize(&self) -> &[u8; crate::SIGNATURE_SIZE] {
@@ -124,11 +135,17 @@ impl MultiSignatureTrait for MultiSignature {
             return Err(CryptoError::InvalidSignature);
         }
 
-        let signature_bytes: [u8; 64] = bytes[0..64].try_into().map_err(|_| CryptoError::InvalidSignature)?;
+        let signature_bytes: [u8; 64] = bytes[0..64]
+            .try_into()
+            .map_err(|_| CryptoError::InvalidSignature)?;
         let r = U256::from_le_slice(&signature_bytes[0..32]);
         let s = U256::from_le_slice(&signature_bytes[32..64]);
 
-        Ok(MultiSignature { r, s, bytes: signature_bytes })
+        Ok(MultiSignature {
+            r,
+            s,
+            bytes: signature_bytes,
+        })
     }
 
     fn serialize(&self) -> &[u8; crate::MULTI_SIGNATURE_SIZE] {
@@ -159,31 +176,40 @@ impl AggregatedSignatureTrait for AggregatedSignature {
             return Err(CryptoError::InvalidSignature);
         }
 
-        let count_slice: [u8; 2] = bytes[0..2].try_into().map_err(|_| CryptoError::InvalidSignature)?;
+        let count_slice: [u8; 2] = bytes[0..2]
+            .try_into()
+            .map_err(|_| CryptoError::InvalidSignature)?;
         let count = u16::from_le_bytes(count_slice) as usize;
         if count > MAX_AGGREGATED_SIGNATURES {
             return Err(CryptoError::InvalidSignature);
         }
 
-        if bytes.len() < AGGREGATED_SIGNATURE_VARIABLE_SIZE * count + AGGREGATED_SIGNATURE_CONSTANT_SIZE {
+        if bytes.len()
+            < AGGREGATED_SIGNATURE_VARIABLE_SIZE * count + AGGREGATED_SIGNATURE_CONSTANT_SIZE
+        {
             return Err(CryptoError::InvalidSignature);
         }
 
-        let s_bytes: [u8; 32] = bytes[2..34].try_into().map_err(|_| CryptoError::InvalidSignature)?;
+        let s_bytes: [u8; 32] = bytes[2..34]
+            .try_into()
+            .map_err(|_| CryptoError::InvalidSignature)?;
         let s = U256::from_le_bytes(s_bytes);
         let mut r_bytes = [[0u8; 32]; MAX_AGGREGATED_SIGNATURES];
 
         for i in 0..count {
             let start = 34 + i * 32;
             let end = start + 32;
-            r_bytes[i] = bytes[start..end].try_into().map_err(|_| CryptoError::InvalidSignature)?;
+            r_bytes[i] = bytes[start..end]
+                .try_into()
+                .map_err(|_| CryptoError::InvalidSignature)?;
         }
 
         Ok(AggregatedSignature { count, r_bytes, s })
     }
 
     fn serialize(&self, out: &mut [u8]) -> Result<usize, CryptoError> {
-        let total_len = AGGREGATED_SIGNATURE_CONSTANT_SIZE + AGGREGATED_SIGNATURE_VARIABLE_SIZE * self.count;
+        let total_len =
+            AGGREGATED_SIGNATURE_CONSTANT_SIZE + AGGREGATED_SIGNATURE_VARIABLE_SIZE * self.count;
         if out.len() < total_len {
             return Err(CryptoError::InvalidSignature);
         }
@@ -239,8 +265,12 @@ impl Crypto {
     #[inline]
     fn g_point() -> Point {
         Point {
-            x: U256::from_be_hex("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798"),
-            y: U256::from_be_hex("483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8"),
+            x: U256::from_be_hex(
+                "79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798",
+            ),
+            y: U256::from_be_hex(
+                "483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8",
+            ),
         }
     }
 
@@ -332,7 +362,11 @@ impl Crypto {
         let slope = Self::mod_mul(three_x_sq, inv, self.p);
         let two_x = Self::mod_add(point.x, point.x, self.p);
         let x = Self::mod_sub(Self::mod_mul(slope, slope, self.p), two_x, self.p);
-        let y = Self::mod_sub(Self::mod_mul(slope, Self::mod_sub(point.x, x, self.p), self.p), point.y, self.p);
+        let y = Self::mod_sub(
+            Self::mod_mul(slope, Self::mod_sub(point.x, x, self.p), self.p),
+            point.y,
+            self.p,
+        );
         Point { x, y }
     }
 
@@ -356,8 +390,16 @@ impl Crypto {
             };
         }
         let slope = Self::mod_mul(Self::mod_sub(point1.y, point2.y, self.p), inv, self.p);
-        let x = Self::mod_sub(Self::mod_sub(Self::mod_mul(slope, slope, self.p), point1.x, self.p), point2.x, self.p);
-        let y = Self::mod_sub(Self::mod_mul(slope, Self::mod_sub(point1.x, x, self.p), self.p), point1.y, self.p);
+        let x = Self::mod_sub(
+            Self::mod_sub(Self::mod_mul(slope, slope, self.p), point1.x, self.p),
+            point2.x,
+            self.p,
+        );
+        let y = Self::mod_sub(
+            Self::mod_mul(slope, Self::mod_sub(point1.x, x, self.p), self.p),
+            point1.y,
+            self.p,
+        );
         Point { x, y }
     }
 
@@ -387,7 +429,13 @@ impl Crypto {
         result
     }
 
-    fn tagged_hash(&self, tag_bytes: &[u8], message1: &[u8], message2: &[u8], message3: &[u8]) -> [u8; 32] {
+    fn tagged_hash(
+        &self,
+        tag_bytes: &[u8],
+        message1: &[u8],
+        message2: &[u8],
+        message3: &[u8],
+    ) -> [u8; 32] {
         let mut hasher = Sha256::new();
         hasher.update(tag_bytes);
         hasher.update(message1);
@@ -397,7 +445,11 @@ impl Crypto {
     }
 
     fn point_from_x(&self, x: &U256) -> Result<Point, CryptoError> {
-        let y_sq = Self::mod_add(Self::mod_mul(Self::mod_mul(*x, *x, self.p), *x, self.p), B, self.p);
+        let y_sq = Self::mod_add(
+            Self::mod_mul(Self::mod_mul(*x, *x, self.p), *x, self.p),
+            B,
+            self.p,
+        );
         let y0 = Self::pow_mod(y_sq, Self::p_sqrt_exp(), self.p);
 
         if x >= &self.p {
@@ -420,7 +472,12 @@ impl Crypto {
         let mut counter = 0u32;
         loop {
             let counter_bytes = counter.to_le_bytes();
-            k0 = U256::from_le_bytes(self.tagged_hash(b"nonce", &self.private_key_bytes, message, &counter_bytes));
+            k0 = U256::from_le_bytes(self.tagged_hash(
+                b"nonce",
+                &self.private_key_bytes,
+                message,
+                &counter_bytes,
+            ));
             k0 = k0.rem(&NonZero::new(self.n).unwrap());
             if k0 > U256::ZERO {
                 break;
@@ -437,14 +494,26 @@ impl Crypto {
 
         let random_bytes = random_point.x.to_le_bytes();
         let random_bytes_trim = Self::trim_le_bytes(&random_bytes);
-        let e = U256::from_le_bytes(self.tagged_hash(b"challenge", random_bytes_trim, &self.public_key.bytes, message))
-            .rem(&NonZero::new(self.n).unwrap());
+        let e = U256::from_le_bytes(self.tagged_hash(
+            b"challenge",
+            random_bytes_trim,
+            &self.public_key.bytes,
+            message,
+        ))
+        .rem(&NonZero::new(self.n).unwrap());
         let r = random_point.x;
         let s = Self::mod_add(k, Self::mod_mul(e, self.private_key, self.n), self.n);
         (r, s)
     }
 
-    fn verify_common(&self, message: &[u8], r: &U256, s: &U256, signature_bytes: [u8; 64], public_key: &PublicKey) -> bool {
+    fn verify_common(
+        &self,
+        message: &[u8],
+        r: &U256,
+        s: &U256,
+        signature_bytes: [u8; 64],
+        public_key: &PublicKey,
+    ) -> bool {
         if *r >= self.p || *s >= self.n {
             return false;
         }
@@ -452,8 +521,9 @@ impl Crypto {
         let mut r_fixed = [0u8; 32];
         r_fixed.copy_from_slice(&signature_bytes[0..32]);
         let r_trim = Self::trim_le_bytes(&r_fixed);
-        let e = U256::from_le_bytes(self.tagged_hash(b"challenge", r_trim, &public_key.bytes, message))
-            .rem(&NonZero::new(self.n).unwrap());
+        let e =
+            U256::from_le_bytes(self.tagged_hash(b"challenge", r_trim, &public_key.bytes, message))
+                .rem(&NonZero::new(self.n).unwrap());
 
         let point1 = self.multiply(s, &self.g);
         let n_minus_e = self.n - e;
@@ -519,15 +589,41 @@ impl CryptoTrait for Crypto {
         MultiSignature::new_from_rs(r, s)
     }
 
-    fn verify_signature(&self, message: &[u8], signature: &Signature, public_key: &PublicKey) -> bool {
-        self.verify_common(message, &signature.r, &signature.s, signature.bytes, public_key)
+    fn verify_signature(
+        &self,
+        message: &[u8],
+        signature: &Signature,
+        public_key: &PublicKey,
+    ) -> bool {
+        self.verify_common(
+            message,
+            &signature.r,
+            &signature.s,
+            signature.bytes,
+            public_key,
+        )
     }
 
-    fn verify_multi_signature(&self, message: &[u8], multi_signature: &MultiSignature, public_key: &PublicKey) -> bool {
-        self.verify_common(message, &multi_signature.r, &multi_signature.s, multi_signature.bytes, public_key)
+    fn verify_multi_signature(
+        &self,
+        message: &[u8],
+        multi_signature: &MultiSignature,
+        public_key: &PublicKey,
+    ) -> bool {
+        self.verify_common(
+            message,
+            &multi_signature.r,
+            &multi_signature.s,
+            multi_signature.bytes,
+            public_key,
+        )
     }
 
-    fn aggregate_signatures(&self, signatures: &[&MultiSignature], message: &[u8]) -> Result<AggregatedSignature, CryptoError> {
+    fn aggregate_signatures(
+        &self,
+        signatures: &[&MultiSignature],
+        message: &[u8],
+    ) -> Result<AggregatedSignature, CryptoError> {
         if signatures.is_empty() || signatures.len() > MAX_AGGREGATED_SIGNATURES {
             return Err(CryptoError::InvalidSignature);
         }
@@ -548,7 +644,12 @@ impl CryptoTrait for Crypto {
         for (i, signature) in signatures.iter().enumerate() {
             let i_bytes = (i as u32).to_le_bytes();
             let i_trim = Self::trim_u32_le_bytes(&i_bytes);
-            let random_base = U256::from_le_bytes(self.tagged_hash(b"rand", &initial_random_seed, i_trim, i_trim));
+            let random_base = U256::from_le_bytes(self.tagged_hash(
+                b"rand",
+                &initial_random_seed,
+                i_trim,
+                i_trim,
+            ));
             let random_number = Self::mod_add(
                 random_base.rem(&NonZero::new(Self::mod_sub(self.n, U256::ONE, self.n)).unwrap()),
                 U256::ONE,
@@ -564,7 +665,12 @@ impl CryptoTrait for Crypto {
         })
     }
 
-    fn verify_aggregated_signature(&self, message: &[u8], aggregated_signature: &AggregatedSignature, public_keys: &[&PublicKey]) -> bool {
+    fn verify_aggregated_signature(
+        &self,
+        message: &[u8],
+        aggregated_signature: &AggregatedSignature,
+        public_keys: &[&PublicKey],
+    ) -> bool {
         if aggregated_signature.get_count() != public_keys.len() {
             return false;
         }
@@ -595,7 +701,12 @@ impl CryptoTrait for Crypto {
 
             let i_u32 = (i as u32).to_le_bytes();
             let i_trim = Self::trim_u32_le_bytes(&i_u32);
-            let random_base = U256::from_le_bytes(self.tagged_hash(b"rand", &initial_random_seed, i_trim, i_trim));
+            let random_base = U256::from_le_bytes(self.tagged_hash(
+                b"rand",
+                &initial_random_seed,
+                i_trim,
+                i_trim,
+            ));
             let random_number = Self::mod_add(
                 random_base.rem(&NonZero::new(Self::mod_sub(self.n, U256::ONE, self.n)).unwrap()),
                 U256::ONE,
@@ -615,8 +726,13 @@ impl CryptoTrait for Crypto {
             }
 
             let r_trim = Self::trim_le_bytes(&aggregated_signature.r_bytes[i]);
-            let e = U256::from_le_bytes(self.tagged_hash(b"challenge", r_trim, &public_keys[i].bytes, message))
-                .rem(&NonZero::new(self.n).unwrap());
+            let e = U256::from_le_bytes(self.tagged_hash(
+                b"challenge",
+                r_trim,
+                &public_keys[i].bytes,
+                message,
+            ))
+            .rem(&NonZero::new(self.n).unwrap());
             let n_minus_e = self.n - e;
             let scalar = Self::mod_mul(n_minus_e, random_number, self.n);
             let pk_point = self.multiply(&scalar, &public_keys[i].point);
