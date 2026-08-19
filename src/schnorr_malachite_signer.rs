@@ -13,13 +13,13 @@ use sha2::{Digest, Sha256};
 use crate::AGGREGATED_SIGNATURE_CONSTANT_SIZE;
 use crate::AGGREGATED_SIGNATURE_VARIABLE_SIZE;
 use crate::AggregatedSignatureTrait;
+use crate::MAX_AGGREGATED_SIGNATURES;
 use crate::MULTI_SIGNATURE_SIZE;
 use crate::MultiSignatureTrait;
 use crate::PRIVATE_KEY_SIZE;
 use crate::PUBLIC_KEY_SIZE;
 use crate::PublicKeyTrait;
 use crate::SIGNATURE_SIZE;
-use crate::MAX_AGGREGATED_SIGNATURES;
 
 use crate::CryptoError;
 use crate::CryptoTrait;
@@ -49,7 +49,9 @@ impl PublicKeyTrait for PublicKey {
             return Err(CryptoError::InvalidPublicKey);
         }
 
-        let public_key_bytes: [u8; 32] = bytes[0..32].try_into().map_err(|_| CryptoError::InvalidPublicKey)?;
+        let public_key_bytes: [u8; 32] = bytes[0..32]
+            .try_into()
+            .map_err(|_| CryptoError::InvalidPublicKey)?;
 
         let point = Self::calculate_public_key_point(&public_key_bytes)?;
         Ok(PublicKey {
@@ -75,7 +77,11 @@ impl PublicKey {
         }
     }
     fn calculate_public_key_point(public_key_bytes: &[u8; 32]) -> Result<Point, CryptoError> {
-        let p_nat = Natural::from_string_base(16, "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F").unwrap();
+        let p_nat = Natural::from_string_base(
+            16,
+            "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F",
+        )
+        .unwrap();
         let x = Natural::from_power_of_2_digits_asc(8, public_key_bytes.iter().cloned()).unwrap();
         let y_sq = (&x * &x * &x + B_NAT) % &p_nat;
         let mut y = (&y_sq).mod_pow(&((&p_nat + ONE_NAT) / FOUR_NAT), &p_nat);
@@ -97,7 +103,10 @@ impl PublicKey {
         let x_integer = Integer::from(x);
         let y_integer = Integer::from(y);
 
-        Ok(Point { x: x_integer, y: y_integer })
+        Ok(Point {
+            x: x_integer,
+            y: y_integer,
+        })
     }
 }
 
@@ -113,12 +122,23 @@ impl SignatureTrait for Signature {
             return Err(CryptoError::InvalidSignature);
         }
 
-        let signature_bytes: [u8; 64] = bytes[0..64].try_into().map_err(|_| CryptoError::InvalidSignature)?;
+        let signature_bytes: [u8; 64] = bytes[0..64]
+            .try_into()
+            .map_err(|_| CryptoError::InvalidSignature)?;
 
-        let r = Integer::from(Natural::from_power_of_2_digits_asc(8, signature_bytes[0..32].iter().cloned()).unwrap());
-        let s = Integer::from(Natural::from_power_of_2_digits_asc(8, signature_bytes[32..64].iter().cloned()).unwrap());
+        let r = Integer::from(
+            Natural::from_power_of_2_digits_asc(8, signature_bytes[0..32].iter().cloned()).unwrap(),
+        );
+        let s = Integer::from(
+            Natural::from_power_of_2_digits_asc(8, signature_bytes[32..64].iter().cloned())
+                .unwrap(),
+        );
 
-        Ok(Signature { r, s, bytes: signature_bytes })
+        Ok(Signature {
+            r,
+            s,
+            bytes: signature_bytes,
+        })
     }
 
     fn serialize(&self) -> &[u8; crate::SIGNATURE_SIZE] {
@@ -158,12 +178,23 @@ impl MultiSignatureTrait for MultiSignature {
             return Err(CryptoError::InvalidSignature);
         }
 
-        let signature_bytes: [u8; 64] = bytes[0..64].try_into().map_err(|_| CryptoError::InvalidSignature)?;
+        let signature_bytes: [u8; 64] = bytes[0..64]
+            .try_into()
+            .map_err(|_| CryptoError::InvalidSignature)?;
 
-        let r = Integer::from(Natural::from_power_of_2_digits_asc(8, signature_bytes[0..32].iter().cloned()).unwrap());
-        let s = Integer::from(Natural::from_power_of_2_digits_asc(8, signature_bytes[32..64].iter().cloned()).unwrap());
+        let r = Integer::from(
+            Natural::from_power_of_2_digits_asc(8, signature_bytes[0..32].iter().cloned()).unwrap(),
+        );
+        let s = Integer::from(
+            Natural::from_power_of_2_digits_asc(8, signature_bytes[32..64].iter().cloned())
+                .unwrap(),
+        );
 
-        Ok(MultiSignature { r, s, bytes: signature_bytes })
+        Ok(MultiSignature {
+            r,
+            s,
+            bytes: signature_bytes,
+        })
     }
 
     fn serialize(&self) -> &[u8; crate::MULTI_SIGNATURE_SIZE] {
@@ -203,17 +234,23 @@ impl AggregatedSignatureTrait for AggregatedSignature {
             return Err(CryptoError::InvalidSignature);
         }
 
-        let count_slice: [u8; 2] = bytes[0..2].try_into().map_err(|_| CryptoError::InvalidSignature)?;
+        let count_slice: [u8; 2] = bytes[0..2]
+            .try_into()
+            .map_err(|_| CryptoError::InvalidSignature)?;
         let count = u16::from_le_bytes(count_slice) as usize;
         if count > MAX_AGGREGATED_SIGNATURES {
             return Err(CryptoError::InvalidSignature);
         }
 
-        if bytes.len() < AGGREGATED_SIGNATURE_VARIABLE_SIZE * count + AGGREGATED_SIGNATURE_CONSTANT_SIZE {
+        if bytes.len()
+            < AGGREGATED_SIGNATURE_VARIABLE_SIZE * count + AGGREGATED_SIGNATURE_CONSTANT_SIZE
+        {
             return Err(CryptoError::InvalidSignature);
         }
 
-        let s_bytes: [u8; 32] = bytes[2..34].try_into().map_err(|_| CryptoError::InvalidSignature)?;
+        let s_bytes: [u8; 32] = bytes[2..34]
+            .try_into()
+            .map_err(|_| CryptoError::InvalidSignature)?;
         let s = Natural::from_power_of_2_digits_asc(8, s_bytes.iter().cloned()).unwrap();
 
         let mut r_bytes = [[0u8; 32]; MAX_AGGREGATED_SIGNATURES];
@@ -221,14 +258,17 @@ impl AggregatedSignatureTrait for AggregatedSignature {
         for i in 0..count {
             let start = 34 + i as usize * 32;
             let end = start + 32;
-            r_bytes[i] = bytes[start..end].try_into().map_err(|_| CryptoError::InvalidSignature)?;
+            r_bytes[i] = bytes[start..end]
+                .try_into()
+                .map_err(|_| CryptoError::InvalidSignature)?;
         }
 
         Ok(AggregatedSignature { count, r_bytes, s })
     }
 
     fn serialize(&self, out: &mut [u8]) -> Result<usize, CryptoError> {
-        let total_len = AGGREGATED_SIGNATURE_CONSTANT_SIZE + AGGREGATED_SIGNATURE_VARIABLE_SIZE * self.count;
+        let total_len =
+            AGGREGATED_SIGNATURE_CONSTANT_SIZE + AGGREGATED_SIGNATURE_VARIABLE_SIZE * self.count;
         if out.len() < total_len {
             return Err(CryptoError::InvalidSignature);
         }
@@ -271,7 +311,12 @@ impl Crypto {
     //Calculate the double of the given point
     fn double(&self, point: &Point) -> Point {
         let nat_py = Natural::saturating_from(&point.y);
-        let inverse = Integer::from(&nat_py.mod_shl(1u8, &self.p_nat).mod_inverse(&self.p_nat).unwrap());
+        let inverse = Integer::from(
+            &nat_py
+                .mod_shl(1u8, &self.p_nat)
+                .mod_inverse(&self.p_nat)
+                .unwrap(),
+        );
         let slope = (THREE * (&point.x).square() * inverse) % &self.p;
 
         let mut x = ((&slope).square() - &point.x * TWO) % &self.p;
@@ -332,7 +377,13 @@ impl Crypto {
     }
 
     // Tagged hash function using SHA256
-    fn tagged_hash(&self, tag_bytes: &[u8], message1: &[u8], message2: &[u8], message3: &[u8]) -> [u8; 32] {
+    fn tagged_hash(
+        &self,
+        tag_bytes: &[u8],
+        message1: &[u8],
+        message2: &[u8],
+        message3: &[u8],
+    ) -> [u8; 32] {
         let mut hasher = Sha256::new();
         hasher.update(tag_bytes);
         hasher.update(message1);
@@ -362,7 +413,10 @@ impl Crypto {
         let x_integer = Integer::from(x);
         let y_integer = Integer::from(y);
 
-        Ok(Point { x: x_integer, y: y_integer })
+        Ok(Point {
+            x: x_integer,
+            y: y_integer,
+        })
     }
 
     fn sign_common(&self, message: &[u8]) -> (Integer, Integer) {
@@ -372,7 +426,13 @@ impl Crypto {
         loop {
             let counter_bytes = counter.to_le_bytes();
             k0 = Integer::from(
-                Natural::from_power_of_2_digits_asc(8, self.tagged_hash(b"nonce", &self.private_key_bytes, &message, &counter_bytes).iter().cloned()).unwrap()
+                Natural::from_power_of_2_digits_asc(
+                    8,
+                    self.tagged_hash(b"nonce", &self.private_key_bytes, &message, &counter_bytes)
+                        .iter()
+                        .cloned(),
+                )
+                .unwrap()
                     % &self.n_nat,
             );
 
@@ -383,13 +443,19 @@ impl Crypto {
         }
 
         let random_point = self.multiply(&k0, &self.g);
-        let k = if (&random_point.y % TWO) == 0 { k0 } else { &self.n - k0 };
+        let k = if (&random_point.y % TWO) == 0 {
+            k0
+        } else {
+            &self.n - k0
+        };
 
         let random_bytes = Natural::saturating_from(&random_point.x).to_power_of_2_digits_asc(8);
 
         let e = Natural::from_power_of_2_digits_asc(
             8,
-            self.tagged_hash(b"challenge", &random_bytes, &self.public_key.bytes, message).iter().cloned(),
+            self.tagged_hash(b"challenge", &random_bytes, &self.public_key.bytes, message)
+                .iter()
+                .cloned(),
         )
         .unwrap()
             % &self.n_nat;
@@ -403,7 +469,14 @@ impl Crypto {
         (r, s)
     }
 
-    fn verify_common(&self, message: &[u8], r: &Integer, s: &Integer, signature_bytes: [u8; 64], public_key: &PublicKey) -> bool {
+    fn verify_common(
+        &self,
+        message: &[u8],
+        r: &Integer,
+        s: &Integer,
+        signature_bytes: [u8; 64],
+        public_key: &PublicKey,
+    ) -> bool {
         if r >= &self.p_nat || s >= &self.n_nat {
             //r value in signature is not less than the elliptic curve field size or s value in signature is not less than the number of points on the elliptic curve
             return false;
@@ -412,9 +485,14 @@ impl Crypto {
         let e = Integer::from(
             Natural::from_power_of_2_digits_asc(
                 8,
-                self.tagged_hash(b"challenge", &signature_bytes[0..32], &public_key.bytes, message)
-                    .iter()
-                    .cloned(),
+                self.tagged_hash(
+                    b"challenge",
+                    &signature_bytes[0..32],
+                    &public_key.bytes,
+                    message,
+                )
+                .iter()
+                .cloned(),
             )
             .unwrap()
                 % &self.n_nat,
@@ -434,16 +512,33 @@ impl Crypto {
 
 impl CryptoTrait for Crypto {
     fn new(private_key_bytes: [u8; PRIVATE_KEY_SIZE]) -> Result<Self, CryptoError> {
-        let p_nat = Natural::from_string_base(16, "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F").unwrap();
+        let p_nat = Natural::from_string_base(
+            16,
+            "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F",
+        )
+        .unwrap();
         let p = Integer::from(&p_nat);
-        let n_nat = Natural::from_string_base(16, "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141").unwrap();
+        let n_nat = Natural::from_string_base(
+            16,
+            "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141",
+        )
+        .unwrap();
         let n = Integer::from(&n_nat);
         let g = Point {
-            x: Integer::from_string_base(16, "79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798").unwrap(),
-            y: Integer::from_string_base(16, "483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8").unwrap(),
+            x: Integer::from_string_base(
+                16,
+                "79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798",
+            )
+            .unwrap(),
+            y: Integer::from_string_base(
+                16,
+                "483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8",
+            )
+            .unwrap(),
         };
 
-        let private_key_int_result = Natural::from_power_of_2_digits_asc(8, private_key_bytes.iter().cloned());
+        let private_key_int_result =
+            Natural::from_power_of_2_digits_asc(8, private_key_bytes.iter().cloned());
         let private_key_nat = match private_key_int_result {
             Some(value) => value,
             None => return Err(CryptoError::InvalidPrivateKey),
@@ -504,21 +599,35 @@ impl CryptoTrait for Crypto {
         multi_signature
     }
 
-    fn verify_signature(&self, message: &[u8], signature: &Signature, public_key: &PublicKey) -> bool {
+    fn verify_signature(
+        &self,
+        message: &[u8],
+        signature: &Signature,
+        public_key: &PublicKey,
+    ) -> bool {
         let r = &signature.r;
         let s = &signature.s;
         let signature_bytes = signature.bytes;
         self.verify_common(message, r, s, signature_bytes, public_key)
     }
 
-    fn verify_multi_signature(&self, message: &[u8], multi_signature: &MultiSignature, public_key: &PublicKey) -> bool {
+    fn verify_multi_signature(
+        &self,
+        message: &[u8],
+        multi_signature: &MultiSignature,
+        public_key: &PublicKey,
+    ) -> bool {
         let r = &multi_signature.r;
         let s = &multi_signature.s;
         let signature_bytes = multi_signature.bytes;
         self.verify_common(message, r, s, signature_bytes, public_key)
     }
 
-    fn aggregate_signatures(&self, signatures: &[&MultiSignature], message: &[u8]) -> Result<AggregatedSignature, CryptoError> {
+    fn aggregate_signatures(
+        &self,
+        signatures: &[&MultiSignature],
+        message: &[u8],
+    ) -> Result<AggregatedSignature, CryptoError> {
         if signatures.is_empty() || signatures.len() > MAX_AGGREGATED_SIGNATURES {
             return Err(CryptoError::InvalidSignature);
         }
@@ -536,7 +645,8 @@ impl CryptoTrait for Crypto {
 
         let r_sum_bytes = &r_sum.to_power_of_2_digits_asc(8);
         //generate the initial random sedd using the sum of r values and the message
-        let initial_random_seed = self.tagged_hash(b"aggregate", &r_sum_bytes, &r_sum_bytes, &message);
+        let initial_random_seed =
+            self.tagged_hash(b"aggregate", &r_sum_bytes, &r_sum_bytes, &message);
 
         //calculate the sum of s values (multiplid by the generated random number) to use in the aggregated signature
         //the random number should be betwen 1 and n-1
@@ -544,8 +654,13 @@ impl CryptoTrait for Crypto {
         for signature in signatures.iter() {
             let i_bytes = Natural::from(i as u32).to_power_of_2_digits_asc(8);
             //calculate the random number using the initial seed and the sequence number
-            let random_number = Natural::from_power_of_2_digits_asc(8, self.tagged_hash(b"rand", &initial_random_seed, &i_bytes, &i_bytes).iter().cloned())
-                .unwrap()
+            let random_number = Natural::from_power_of_2_digits_asc(
+                8,
+                self.tagged_hash(b"rand", &initial_random_seed, &i_bytes, &i_bytes)
+                    .iter()
+                    .cloned(),
+            )
+            .unwrap()
                 % (&self.n_nat - &ONE_NAT)
                 + &ONE_NAT;
 
@@ -559,7 +674,12 @@ impl CryptoTrait for Crypto {
         })
     }
 
-    fn verify_aggregated_signature(&self, message: &[u8], aggregated_signature: &AggregatedSignature, public_keys: &[&PublicKey]) -> bool {
+    fn verify_aggregated_signature(
+        &self,
+        message: &[u8],
+        aggregated_signature: &AggregatedSignature,
+        public_keys: &[&PublicKey],
+    ) -> bool {
         if aggregated_signature.get_count() != public_keys.len() {
             return false;
         }
@@ -567,11 +687,20 @@ impl CryptoTrait for Crypto {
         //calculate the sum of r values to use in the initial seed of the random number generation
         let mut r_sum = Natural::from(0u32);
         for i in 0..aggregated_signature.get_count() {
-            let r_value = Natural::from_power_of_2_digits_asc(8, aggregated_signature.r_bytes[i].iter().cloned()).unwrap();
+            let r_value = Natural::from_power_of_2_digits_asc(
+                8,
+                aggregated_signature.r_bytes[i].iter().cloned(),
+            )
+            .unwrap();
             r_sum = (r_sum + r_value) % &self.p_nat;
         }
         let r_initrand_sum_bytes = &r_sum.to_power_of_2_digits_asc(8);
-        let initial_random_seed = self.tagged_hash(b"aggregate", &r_initrand_sum_bytes, &r_initrand_sum_bytes, &message);
+        let initial_random_seed = self.tagged_hash(
+            b"aggregate",
+            &r_initrand_sum_bytes,
+            &r_initrand_sum_bytes,
+            &message,
+        );
 
         //calculate the sum of r values (multiplid by the generated random number) and the sum ok public keys multiplied by (n-ex)
         let mut r_point_sum = Point {
@@ -583,7 +712,11 @@ impl CryptoTrait for Crypto {
             y: Integer::from(0),
         };
         for i in 0..aggregated_signature.get_count() {
-            let r_value = Natural::from_power_of_2_digits_asc(8, aggregated_signature.r_bytes[i].iter().cloned()).unwrap();
+            let r_value = Natural::from_power_of_2_digits_asc(
+                8,
+                aggregated_signature.r_bytes[i].iter().cloned(),
+            )
+            .unwrap();
             if &r_value >= &self.p_nat || &aggregated_signature.s >= &self.n_nat {
                 //r value in signature is not less than the elliptic curve field size or s value in signature is not less than the number of points on the elliptic curve
                 return false;
@@ -591,8 +724,13 @@ impl CryptoTrait for Crypto {
 
             //calculate the random number using the initial seed and the sequence number
             let i_bytes = Natural::from(i as u32).to_power_of_2_digits_asc(8);
-            let random_number = Natural::from_power_of_2_digits_asc(8, self.tagged_hash(b"rand", &initial_random_seed, &i_bytes, &i_bytes).iter().cloned())
-                .unwrap()
+            let random_number = Natural::from_power_of_2_digits_asc(
+                8,
+                self.tagged_hash(b"rand", &initial_random_seed, &i_bytes, &i_bytes)
+                    .iter()
+                    .cloned(),
+            )
+            .unwrap()
                 % (&self.n_nat - &ONE_NAT)
                 + &ONE_NAT;
 
@@ -613,14 +751,22 @@ impl CryptoTrait for Crypto {
             //calculate the challenge
             let e = Natural::from_power_of_2_digits_asc(
                 8,
-                self.tagged_hash(b"challenge", &aggregated_signature.r_bytes[i], &public_keys[i].bytes, message)
-                    .iter()
-                    .cloned(),
+                self.tagged_hash(
+                    b"challenge",
+                    &aggregated_signature.r_bytes[i],
+                    &public_keys[i].bytes,
+                    message,
+                )
+                .iter()
+                .cloned(),
             )
             .unwrap()
                 % &self.n_nat;
 
-            let pk_point = self.multiply(&Integer::from(&(&self.n_nat - e) * &random_number), &public_keys[i].point);
+            let pk_point = self.multiply(
+                &Integer::from(&(&self.n_nat - e) * &random_number),
+                &public_keys[i].point,
+            );
             if i > 0 {
                 pk_point_sum = self.add(&pk_point_sum, &pk_point);
             } else {
