@@ -6,7 +6,7 @@
 - Prefer fast verification over fast signing (verification dominates node workload).
 - Preserve support for aggregation-ready signatures and aggregated approval evidence workflows.
 - Keep the Schnorr / BLS choice selectable at compile time through feature flags.
-- Use audited, pure-Rust, `no_std`, allocation-free curve libraries only (no C code).
+- Use established pure-Rust, `no_std`, allocation-free curve libraries only (no C code). `bls12_381`'s hash-to-curve sits behind its `experimental` feature; keep it pinned by the RFC 9380 and Ethereum vectors.
 
 ## Project Structure & Module Organization
 - `src/lib.rs` defines public traits, constants, feature gates, compile-time checks, re-exports and the cross-backend tests.
@@ -42,7 +42,7 @@
 - Schnorr (`schnorr`):
   - BIP-340 single signatures, deterministic (zero auxiliary randomness), x-only 32 B keys.
   - DEC-194 aggregate: weights from the tagged hashes `MoonBlokz/aggregate` and `MoonBlokz/weight` bound to all nonces, all keys and the message; `count (u16, big-endian) ‖ s ‖ r_i`; the full point equation is checked one signer at a time (no MSM, for stack).
-  - Proof of possession: a BIP-340 signature over the bytes `MoonBlokz/pop ‖ key`.
+  - Proof of possession: a BIP-340 signature over the bytes `MoonBlokz/pop ‖ key`, separated by message only (an ordinary signature over exactly those bytes is a proof too; no MoonBlokz message has that form).
 - BLS (`bls-min-sig`, `bls-min-pk`):
   - IETF BLS signature draft, proof-of-possession suite, in both size variants; private key is a 32 B big-endian scalar.
   - `KeyValidate` refuses the identity and non-subgroup points; aggregation needs every key to carry a verified proof of possession (`PopProve` / `PopVerify` DSTs).

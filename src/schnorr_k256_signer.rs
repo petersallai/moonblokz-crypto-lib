@@ -18,9 +18,10 @@
 //! signer keep the verification frame small (D2).
 
 use crate::{
-    AggregatedSignatureTrait, CryptoError, CryptoTrait, MAX_AGGREGATED_SIGNATURE_BYTES,
-    MAX_AGGREGATED_SIGNATURES, MULTI_SIGNATURE_SIZE, MultiSignatureTrait, PRIVATE_KEY_SIZE,
-    PUBLIC_KEY_SIZE, PublicKeyTrait, SIGNATURE_SIZE, SignatureTrait,
+    AGGREGATED_SIGNATURE_CONSTANT_SIZE, AGGREGATED_SIGNATURE_VARIABLE_SIZE,
+    AggregatedSignatureTrait, CryptoError, CryptoTrait, MAX_AGGREGATED_SIGNATURES,
+    MULTI_SIGNATURE_SIZE, MultiSignatureTrait, PRIVATE_KEY_SIZE, PUBLIC_KEY_SIZE, PublicKeyTrait,
+    SIGNATURE_SIZE, SignatureTrait,
 };
 use k256::elliptic_curve::{PrimeField, group::Group, ops::Reduce};
 use k256::schnorr::signature::hazmat::PrehashSigner;
@@ -28,9 +29,16 @@ use k256::schnorr::{Signature as Bip340Signature, SigningKey, VerifyingKey};
 use k256::sha2::{Digest, Sha256};
 use k256::{FieldBytes, ProjectivePoint, Scalar, U256};
 
-/// The proof-of-possession domain tag (D6): a proof is a BIP-340 signature over
-/// `POP_TAG ‖ public key`, which no ordinary signature over 32 bytes can be.
+/// The proof-of-possession domain tag (D6, DEC-248): a proof is a BIP-340 signature over
+/// `POP_TAG ‖ public key` (45 bytes). The separation is by message: an ordinary signature
+/// over exactly those bytes is a proof too. No MoonBlokz message has that form
+/// (transactions start with their type byte, blocks with the version, supports with
+/// `MBSUP`, chain configurations with their entry count), and Schnorr aggregation does not
+/// rely on the proof.
 const POP_TAG: &[u8] = b"MoonBlokz/pop";
+/// `count ‖ s` and the per-signer `r` of the serialized aggregate.
+const CONSTANT: usize = AGGREGATED_SIGNATURE_CONSTANT_SIZE;
+const R: usize = AGGREGATED_SIGNATURE_VARIABLE_SIZE;
 const AGGREGATE_TAG: &[u8] = b"MoonBlokz/aggregate";
 const WEIGHT_TAG: &[u8] = b"MoonBlokz/weight";
 const CHALLENGE_TAG: &[u8] = b"BIP0340/challenge";
@@ -205,31 +213,31 @@ impl AggregatedSignatureTrait for AggregatedSignature {
     /// trailing bytes are left to the caller (`serialized_len`). A count of 0 or above
     /// `MAX_AGGREGATED_SIGNATURES` is refused.
     fn new(bytes: &[u8]) -> Result<Self, CryptoError> {
-        if bytes.len() < 34 {
+        if bytes.len() < CONSTANT {
             return Err(CryptoError::InvalidSignature);
         }
         let count = u16::from_be_bytes([bytes[0], bytes[1]]) as usize;
-        if count == 0 || count > MAX_AGGREGATED_SIGNATURES || bytes.len() < 34 + 32 * count {
+        if count == 0 || count > MAX_AGGREGATED_SIGNATURES || bytes.len() < CONSTANT + R * count {
             return Err(CryptoError::InvalidSignature);
         }
         let mut s = [0u8; 32];
-        s.copy_from_slice(&bytes[2..34]);
+        s.copy_from_slice(&bytes[2..CONSTANT]);
         let mut r = [[0u8; 32]; MAX_AGGREGATED_SIGNATURES];
         for (i, slot) in r.iter_mut().take(count).enumerate() {
-            slot.copy_from_slice(&bytes[34 + 32 * i..66 + 32 * i]);
+            slot.copy_from_slice(&bytes[CONSTANT + R * i..CONSTANT + R * (i + 1)]);
         }
         Ok(Self { count, s, r })
     }
 
     fn serialize(&self, out: &mut [u8]) -> Result<usize, CryptoError> {
         let len = self.serialized_len();
-        if out.len() < len || len > MAX_AGGREGATED_SIGNATURE_BYTES {
+        if out.len() < len {
             return Err(CryptoError::InvalidSignature);
         }
         out[..2].copy_from_slice(&(self.count as u16).to_be_bytes());
-        out[2..34].copy_from_slice(&self.s);
+        out[2..CONSTANT].copy_from_slice(&self.s);
         for (i, r) in self.r.iter().take(self.count).enumerate() {
-            out[34 + 32 * i..66 + 32 * i].copy_from_slice(r);
+            out[CONSTANT + R * i..CONSTANT + R * (i + 1)].copy_from_slice(r);
         }
         Ok(len)
     }
@@ -239,15 +247,15 @@ impl AggregatedSignatureTrait for AggregatedSignature {
     }
 
     fn serialized_len(&self) -> usize {
-        34 + 32 * self.count
+        CONSTANT + R * self.count
     }
 }
 
 impl Crypto {
     fn sign_bytes(&self, message: &[u8]) -> [u8; SIGNATURE_SIZE] {
         // `sign_prehash` is BIP-340 with zero auxiliary randomness, retrying with another
-        // auxiliary byte only if `k` or `s` is 0; failing all 256 tries has probability
-        // about 2⁻²⁰⁴⁸.
+        // auxiliary byte only if the nonce is 0; failing all 256 tries has probability
+        // about 2⁻²⁰⁴⁸ (documented on `CryptoTrait::sign`).
         let signature: Bip340Signature = self
             .signing_key
             .sign_prehash(message)

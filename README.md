@@ -12,7 +12,7 @@ The library is designed for the MoonBlokz operating environment:
 - compact serialized artifacts,
 - and bounded aggregation behavior.
 
-Both families sit on audited, pure-Rust curve libraries with no C code and no allocator: Schnorr is BIP-340 on secp256k1 through `k256`, and BLS is the IETF proof-of-possession suite on BLS12-381 through zkcrypto `bls12_381`. The crate adds the MoonBlokz aggregate format on top (DEC-194 for Schnorr) and proofs of possession for key registration.
+Both families sit on established pure-Rust curve libraries with no C code and no allocator: Schnorr is BIP-340 on secp256k1 through `k256`, and BLS is the IETF proof-of-possession suite on BLS12-381 through zkcrypto `bls12_381` (its hash-to-curve is behind the crate's `experimental` feature and is pinned here by the RFC 9380 vectors). The crate adds the MoonBlokz aggregate format on top (DEC-194 for Schnorr) and proofs of possession for key registration.
 
 Comprehensive background about MoonBlokz and the cryptographic design direction can be found in the [MoonBlokz article series](https://medium.com/@peter.sallai/moonblokz-series-part-i-building-a-hyper-local-blockchain-2f385b763c65). Part VI discusses the cryptographic design space.
 
@@ -160,13 +160,13 @@ At build time, exactly one backend provides these same public types and operatio
 - Aggregation is bounded: `MAX_AGGREGATED_SIGNATURES = 50`.
 - Schnorr signing is deterministic (BIP-340 with zero auxiliary randomness). The aggregate is `count (u16, big-endian) ‖ s ‖ r_1 … r_k`; each signer's weight is a tagged hash over all nonces, all keys and the message, and verification checks the full point equation one signer at a time (no multi-scalar multiplication, to keep the stack small).
 - A BLS aggregate is `count (u16, big-endian) ‖ point`; a key is accepted only after `KeyValidate` (the identity is refused) and, before it is aggregated, a verified proof of possession.
-- A proof of possession signs the key in a domain of its own (`MoonBlokz/pop` for Schnorr, the IETF PoP DST for BLS), so no ordinary signature can serve as one.
+- A proof of possession signs the key in a domain of its own. BLS uses the IETF PoP DST, so no ordinary signature is a proof. Schnorr signs `MoonBlokz/pop ‖ key`: the separation is by message, so an ordinary signature over exactly those 45 bytes is a proof too; no MoonBlokz message has that form, and Schnorr aggregation does not rely on the proof.
 
 ---
 
 ## Testing
 
-The tests cover signing and verification, serialization, aggregation and its refusals, proofs of possession, and known-answer vectors: the BIP-340 vectors and a pinned DEC-194 aggregate for `schnorr`; RFC 9380 hash-to-curve, an Ethereum consensus vector and a cross-check against `blst` for the BLS schemes.
+The tests cover signing and verification, serialization, aggregation and its refusals, proofs of possession, and known-answer vectors: the BIP-340 vectors for `schnorr`, plus a pinned DEC-194 aggregate (a regression vector produced by this implementation, not an independent known answer); RFC 9380 hash-to-curve, a cross-check against `blst` and, for `bls-min-pk`, the Ethereum consensus-spec vectors (`ethereum/bls12-381-tests` v0.1.2: sign, verify, fast aggregate verify, deserialization) for the BLS schemes.
 
 ```sh
 cargo test                                               # schnorr

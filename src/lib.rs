@@ -163,6 +163,8 @@ pub mod schnorr_k256_signer;
 #[cfg(feature = "schnorr")]
 pub use schnorr_k256_signer::{AggregatedSignature, Crypto, MultiSignature, PublicKey, Signature};
 
+#[cfg(all(test, feature = "bls"))]
+mod bls_eth_vectors;
 #[cfg(feature = "bls")]
 pub mod bls_zkcrypto_signer;
 #[cfg(feature = "bls")]
@@ -277,6 +279,13 @@ pub trait CryptoTrait: Sized {
     fn public_key(&self) -> &PublicKey;
 
     /// Creates a `Signature` for a message.
+    ///
+    /// # Panics
+    ///
+    /// The Schnorr backend panics if BIP-340 signing fails for all 256 auxiliary bytes it
+    /// tries (a zero nonce each time): probability about 2⁻²⁰⁴⁸. The same holds for
+    /// [`CryptoTrait::multi_sign`] and [`CryptoTrait::prove_possession`]. BLS signing does
+    /// not panic.
     fn sign(&self, message: &[u8]) -> Signature;
 
     /// Creates a `MultiSignature` for a message.
@@ -305,6 +314,11 @@ pub trait CryptoTrait: Sized {
     /// order. Schnorr binds every weight to all nonces, all keys and the message (DEC-194);
     /// BLS ignores the keys. Empty input, more than `MAX_AGGREGATED_SIGNATURES` signatures
     /// and a length mismatch are errors.
+    ///
+    /// The caller verifies every contribution against its key before aggregating, and
+    /// ensures the signers are distinct: neither is checked here, so an invalid
+    /// contribution or key yields an aggregate that never verifies, and a repeated signer
+    /// is counted twice.
     fn aggregate_signatures(
         &self,
         signatures: &[&MultiSignature],
@@ -318,7 +332,8 @@ pub trait CryptoTrait: Sized {
     /// Precondition for BLS: every key carries a verified proof of possession
     /// ([`CryptoTrait::verify_possession`]); the proof-of-possession suite has no rogue-key
     /// coefficients. Schnorr half-aggregation does not need it (each signature binds its own
-    /// key through its challenge).
+    /// key through its challenge). Signer distinctness is the caller's check: a repeated key
+    /// is not refused.
     fn verify_aggregated_signature(
         &self,
         message: &[u8],
@@ -327,7 +342,10 @@ pub trait CryptoTrait: Sized {
     ) -> bool;
 
     /// Proves possession of this signer's private key: a `Signature` over the signer's own
-    /// public key in a domain of its own, so no ordinary signature can serve as a proof.
+    /// public key in a domain of its own. BLS separates it by the suite's PoP DST, so no
+    /// ordinary signature is a proof. Schnorr separates it by message: the proof signs
+    /// `"MoonBlokz/pop" ‖ key`, so an ordinary signature over exactly those bytes is one too;
+    /// MoonBlokz never signs such a message, and Schnorr aggregation does not rely on it.
     fn prove_possession(&self) -> Signature;
 
     /// Verifies a proof of possession made by [`CryptoTrait::prove_possession`] for `public_key`.
@@ -828,6 +846,18 @@ mod tests {
         assert!(!a.verify_signature(key, &a.prove_possession(), a.public_key()));
     }
 
+    /// Schnorr separates the proof by message only (DEC-248): an ordinary signature over
+    /// `"MoonBlokz/pop" ‖ key` is a proof. Pinned so the documented limit stays true.
+    #[cfg(feature = "schnorr")]
+    #[test]
+    fn schnorr_possession_is_separated_by_message() {
+        let a = signer(1);
+        let mut message = [0u8; 13 + PUBLIC_KEY_SIZE];
+        message[..13].copy_from_slice(b"MoonBlokz/pop");
+        message[13..].copy_from_slice(a.public_key().serialize());
+        assert!(a.verify_possession(a.public_key(), &a.sign(&message)));
+    }
+
     #[test]
     fn aggregate_refuses_a_key_count_mismatch() {
         let a = signer(1);
@@ -888,10 +918,23 @@ mod tests {
 
     #[test]
     fn aggregated_signature_refuses_a_zero_count() {
+        // A valid aggregate with only its count zeroed: the count rule alone refuses it.
+        let (a, b) = (signer(1), signer(2));
+        let message = b"m";
+        let (sa, sb) = (a.multi_sign(message), b.multi_sign(message));
+        let keys = [a.public_key().serialize(), b.public_key().serialize()];
+        let agg = match a.aggregate_signatures(&[&sa, &sb], &keys, message) {
+            Ok(agg) => agg,
+            Err(_) => panic!("aggregate"),
+        };
         let mut bytes = [0u8; MAX_AGGREGATED_SIGNATURE_BYTES];
-        bytes[AGGREGATED_SIGNATURE_CONSTANT_SIZE - 1] = 1;
-        assert!(AggregatedSignature::new(&bytes[..AGGREGATED_SIGNATURE_CONSTANT_SIZE]).is_err());
-        assert!(AggregatedSignature::new(&[0u8; AGGREGATED_SIGNATURE_CONSTANT_SIZE]).is_err());
+        let len = match agg.serialize(&mut bytes) {
+            Ok(len) => len,
+            Err(_) => panic!("serialize"),
+        };
+        assert!(AggregatedSignature::new(&bytes[..len]).is_ok());
+        bytes[..2].copy_from_slice(&[0, 0]);
+        assert!(AggregatedSignature::new(&bytes[..len]).is_err());
     }
 
     /// DEC-194 / DEC-235 specifics of the Schnorr aggregate.
