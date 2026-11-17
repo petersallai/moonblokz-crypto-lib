@@ -152,6 +152,19 @@ pub const AGGREGATED_SIGNATURE_VARIABLE_SIZE: usize = 0;
 /// Size of a private key in bytes.
 pub const PRIVATE_KEY_SIZE: usize = 32;
 
+/// The build's signature scheme as the chain names it (configuration ID 33
+/// `signature_scheme`, DEC-252): 0 `schnorr`, 1 `bls-min-sig`, 2 `bls-min-pk`.
+#[cfg(feature = "schnorr")]
+pub const SIGNATURE_SCHEME: u8 = 0;
+/// The build's signature scheme as the chain names it (configuration ID 33
+/// `signature_scheme`, DEC-252): 0 `schnorr`, 1 `bls-min-sig`, 2 `bls-min-pk`.
+#[cfg(feature = "bls-min-sig")]
+pub const SIGNATURE_SCHEME: u8 = 1;
+/// The build's signature scheme as the chain names it (configuration ID 33
+/// `signature_scheme`, DEC-252): 0 `schnorr`, 1 `bls-min-sig`, 2 `bls-min-pk`.
+#[cfg(feature = "bls-min-pk")]
+pub const SIGNATURE_SCHEME: u8 = 2;
+
 /// Maximum number of signer contributions supported in an `AggregatedSignature`.
 pub const MAX_AGGREGATED_SIGNATURES: usize = 50;
 /// Maximum serialized size of an `AggregatedSignature` in bytes.
@@ -815,6 +828,18 @@ mod tests {
             Ok(signer) => signer,
             Err(_) => panic!("failed to create signer {seed}"),
         }
+    }
+
+    /// The code the chain configuration names (ID 33) matches the build's sizes.
+    #[test]
+    fn signature_scheme_matches_the_sizes() {
+        let expected = match (SIGNATURE_SIZE, PUBLIC_KEY_SIZE) {
+            (64, 32) => 0,
+            (48, 96) => 1,
+            (96, 48) => 2,
+            _ => panic!("unknown scheme sizes"),
+        };
+        assert_eq!(SIGNATURE_SCHEME, expected);
     }
 
     #[test]
