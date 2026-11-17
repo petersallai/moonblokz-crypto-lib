@@ -1,7 +1,13 @@
+#!/bin/sh
+# Runs the gates for every backend feature: tests with coverage, doctests, clippy and rustfmt.
+# The crate forbids `unsafe` (`#![forbid(unsafe_code)]`), so there is no Miri gate.
+set -e
+cargo fmt --check
 cargo llvm-cov clean
-rm target/lcov.info
-cargo llvm-cov nextest --no-report --no-default-features --features bls-bls12_381-bls --output-path ./target/lcov.info
-cargo llvm-cov nextest --no-report --no-default-features --features schnorr-malachite --output-path ./target/lcov.info
-cargo llvm-cov nextest --no-report --no-default-features --features schnorr-num-bigint-dig --output-path ./target/lcov.info
-cargo llvm-cov nextest --no-report --no-default-features --features schnorr-crypto-bigint --output-path ./target/lcov.info
+rm -f target/lcov.info
+for backend in schnorr bls-min-sig bls-min-pk; do
+    cargo clippy --all-targets --no-default-features --features "$backend" -- -D warnings
+    cargo llvm-cov nextest --no-report --no-default-features --features "$backend" --output-path ./target/lcov.info
+    cargo test --doc --no-default-features --features "$backend"
+done
 cargo llvm-cov report --lcov --output-path ./target/lcov.info
