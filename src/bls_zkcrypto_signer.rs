@@ -42,6 +42,9 @@ trait Variant {
 
     /// Decompresses with the subgroup check and refuses the identity.
     fn parse_sig(bytes: &[u8; SIGNATURE_SIZE]) -> Option<Self::Sig>;
+    /// Decompresses a signature that a constructor has already validated (a
+    /// `MultiSignature`), without repeating the subgroup check.
+    fn parse_valid_sig(bytes: &[u8; SIGNATURE_SIZE]) -> Option<Self::Sig>;
     fn parse_key(bytes: &[u8; PUBLIC_KEY_SIZE]) -> Option<Self::Key>;
     fn key_of(sk: &Scalar) -> [u8; PUBLIC_KEY_SIZE];
     /// `sk · H(message)` in the signature group, serialized.
@@ -53,6 +56,7 @@ trait Variant {
     fn sig_sum() -> Self::SigSum;
     fn add_sig(sum: &mut Self::SigSum, sig: &Self::Sig);
     fn sig_of_sum(sum: &Self::SigSum) -> [u8; SIGNATURE_SIZE];
+    fn sum_is_identity(sum: &Self::SigSum) -> bool;
     fn key_sum() -> Self::KeySum;
     fn add_key(sum: &mut Self::KeySum, key: &Self::Key);
     /// The summed key, or `None` when it is the identity.
@@ -96,6 +100,9 @@ impl Variant for MinSig {
     fn parse_sig(bytes: &[u8; SIGNATURE_SIZE]) -> Option<G1Affine> {
         g1_from_bytes(bytes)
     }
+    fn parse_valid_sig(bytes: &[u8; SIGNATURE_SIZE]) -> Option<G1Affine> {
+        Option::<G1Affine>::from(G1Affine::from_compressed_unchecked(bytes))
+    }
     fn parse_key(bytes: &[u8; PUBLIC_KEY_SIZE]) -> Option<G2Affine> {
         g2_from_bytes(bytes)
     }
@@ -117,6 +124,9 @@ impl Variant for MinSig {
     }
     fn sig_of_sum(sum: &G1Projective) -> [u8; SIGNATURE_SIZE] {
         G1Affine::from(sum).to_compressed()
+    }
+    fn sum_is_identity(sum: &G1Projective) -> bool {
+        bool::from(sum.is_identity())
     }
     fn key_sum() -> G2Projective {
         G2Projective::identity()
@@ -147,6 +157,9 @@ impl Variant for MinPk {
     fn parse_sig(bytes: &[u8; SIGNATURE_SIZE]) -> Option<G2Affine> {
         g2_from_bytes(bytes)
     }
+    fn parse_valid_sig(bytes: &[u8; SIGNATURE_SIZE]) -> Option<G2Affine> {
+        Option::<G2Affine>::from(G2Affine::from_compressed_unchecked(bytes))
+    }
     fn parse_key(bytes: &[u8; PUBLIC_KEY_SIZE]) -> Option<G1Affine> {
         g1_from_bytes(bytes)
     }
@@ -168,6 +181,9 @@ impl Variant for MinPk {
     }
     fn sig_of_sum(sum: &G2Projective) -> [u8; SIGNATURE_SIZE] {
         G2Affine::from(sum).to_compressed()
+    }
+    fn sum_is_identity(sum: &G2Projective) -> bool {
+        bool::from(sum.is_identity())
     }
     fn key_sum() -> G1Projective {
         G1Projective::identity()
@@ -378,14 +394,23 @@ impl CryptoTrait for Crypto {
         }
         let mut sum = Suite::sig_sum();
         for signature in signatures {
-            let point = Suite::parse_sig(&signature.bytes).ok_or(CryptoError::InvalidSignature)?;
+            // A `MultiSignature` always holds a subgroup point other than the identity:
+            // `MultiSignature::new` parses with the subgroup check, `multi_sign` produces
+            // `sk * H(m)`, and the field is private. So only the decompression is repeated
+            // here (6.17 AC0: the subgroup check was most of the cost).
+            let point =
+                Suite::parse_valid_sig(&signature.bytes).ok_or(CryptoError::InvalidSignature)?;
             Suite::add_sig(&mut sum, &point);
         }
-        let bytes = Suite::sig_of_sum(&sum);
-        // A sum that cancels to the identity would serialize into bytes that
-        // `AggregatedSignature::new` refuses.
-        Suite::parse_sig(&bytes).ok_or(CryptoError::InvalidSignature)?;
-        Ok(AggregatedSignature { count, bytes })
+        // A sum of subgroup points stays in the subgroup; only a sum that cancels to the
+        // identity would serialize into bytes that `AggregatedSignature::new` refuses.
+        if Suite::sum_is_identity(&sum) {
+            return Err(CryptoError::InvalidSignature);
+        }
+        Ok(AggregatedSignature {
+            count,
+            bytes: Suite::sig_of_sum(&sum),
+        })
     }
 
     fn verify_aggregated_signature(
@@ -754,6 +779,29 @@ mod tests {
         assert!(signers[0].verify_aggregated_signature(message, &agg, &keys));
         assert!(!signers[0].verify_aggregated_signature(message, &agg, &keys[..39]));
         assert!(!signers[0].verify_aggregated_signature(b"other", &agg, &keys));
+    }
+
+    /// `aggregate_signatures` decompresses contributions without the subgroup check
+    /// (6.17 AC0), relying on this invariant: no `MultiSignature` holds a point outside
+    /// the subgroup or the identity.
+    #[test]
+    fn a_multi_signature_cannot_hold_an_off_subgroup_point_or_the_identity() {
+        let (vectors, size) = if SIGNATURE_SIZE == 48 {
+            (eth::DESERIALIZATION_G1, 48)
+        } else {
+            (eth::DESERIALIZATION_G2, 96)
+        };
+        let off_subgroup = vectors
+            .iter()
+            .find(|(case, _, _)| case.starts_with("deserialization_fails_not_in_G"))
+            .unwrap_or_else(|| panic!("vector"));
+        let mut pb = [0u8; 192];
+        let bytes = hex_into(off_subgroup.1, &mut pb);
+        assert_eq!(bytes.len(), size);
+        assert!(MultiSignature::new(bytes).is_err());
+        let mut identity = [0u8; SIGNATURE_SIZE];
+        identity[0] = 0xC0;
+        assert!(MultiSignature::new(&identity).is_err());
     }
 
     #[test]
