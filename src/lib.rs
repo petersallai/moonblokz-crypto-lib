@@ -214,6 +214,13 @@ pub trait SignatureTrait: Sized {
 /// A trait representing a `MultiSignature`.
 ///
 /// In the public API, `MultiSignature` is the aggregation-ready single-signer artifact.
+///
+/// **Invariant (every backend, every constructor):** a `MultiSignature` value always holds
+/// a well-formed signature; on BLS a point of the prime-order subgroup other than the
+/// identity. [`MultiSignatureTrait::new`] and [`CryptoTrait::multi_sign`] are the only
+/// ways to obtain one, and the value is opaque. [`CryptoTrait::aggregate_signatures`]
+/// relies on it: BLS decompresses the contributions without repeating the subgroup check
+/// (Story 6.17 AC0). A new constructor must keep it.
 pub trait MultiSignatureTrait: Sized {
     /// Creates a `MultiSignature` from serialized bytes.
     ///
@@ -331,7 +338,9 @@ pub trait CryptoTrait: Sized {
     /// The caller verifies every contribution against its key before aggregating, and
     /// ensures the signers are distinct: neither is checked here, so an invalid
     /// contribution or key yields an aggregate that never verifies, and a repeated signer
-    /// is counted twice.
+    /// is counted twice. Each contribution is taken as the validated point the
+    /// [`MultiSignatureTrait`] invariant guarantees, not re-validated; a sum that is the
+    /// identity is refused.
     fn aggregate_signatures(
         &self,
         signatures: &[&MultiSignature],
